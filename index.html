@@ -18,34 +18,28 @@
 }
 html,body{height:100%;background:var(--bg);font-family:var(--font);-webkit-font-smoothing:antialiased;overscroll-behavior:none;}
 .shell{display:flex;justify-content:center;min-height:100vh;background:var(--bg);}
-.phone{width:100%;max-width:480px;min-height:100vh;background:var(--bg);position:relative;display:flex;flex-direction:column;}
+.phone{width:100%;max-width:480px;min-height:100vh;background:var(--bg);position:relative;display:flex;flex-direction:column;padding-top:env(safe-area-inset-top,0px);padding-top:max(env(safe-area-inset-top,0px),44px);}
 
-/* Sync bar */
-.sync-bar{background:#071a0e;border-bottom:1px solid var(--brd);padding:5px 16px;display:flex;align-items:center;justify-content:space-between;flex-shrink:0;}
-.sync-bar.err{background:#1a0707;}
-.sync-code{font-size:11px;color:var(--muted);display:flex;align-items:center;gap:6px;}
-.code-pill{background:#0f2a14;border:1px solid var(--brd2);border-radius:20px;padding:2px 10px;cursor:pointer;display:flex;align-items:center;gap:5px;}
-.code-pill:hover{background:#1a3a20;}
-.code-val{color:var(--gold);font-weight:700;letter-spacing:1.5px;font-size:12px;}
-.copy-icon{color:var(--muted);font-size:10px;}
-.sync-status{font-size:10px;display:flex;align-items:center;gap:4px;}
-.dot{width:6px;height:6px;border-radius:50%;flex-shrink:0;}
+/* Sync dot (inline in nav) */
+.dot{width:6px;height:6px;border-radius:50%;flex-shrink:0;display:inline-block;}
 .dot.ok{background:var(--green2);}
 .dot.spin{background:var(--amber);animation:pulse 1s infinite;}
 .dot.err{background:var(--red);}
 @keyframes pulse{0%,100%{opacity:1}50%{opacity:.3}}
+/* Code pill (inline in nav) */
+.code-pill{background:#0f2a14;border:1px solid var(--brd2);border-radius:20px;padding:2px 9px;cursor:pointer;display:inline-flex;align-items:center;gap:4px;vertical-align:middle;}
+.code-pill:hover{background:#1a3a20;}
+.code-val{color:var(--gold);font-weight:700;letter-spacing:1.2px;font-size:11px;}
 
 /* Nav */
 .tnav{display:flex;align-items:center;justify-content:space-between;padding:10px 16px 8px;border-bottom:1px solid var(--brd);flex-shrink:0;}
 .bbtn{background:none;border:none;color:var(--green);font-size:13px;cursor:pointer;padding:5px 8px;border-radius:8px;font-family:var(--font);}
 .bbtn:hover{background:var(--brd);}
 .bbtn.inv{visibility:hidden;pointer-events:none;}
-.ntc{text-align:center;}
-.ns{font-size:9px;color:var(--muted);letter-spacing:1.5px;text-transform:uppercase;}
-.nt{font-size:16px;font-weight:700;color:var(--gold);}
+
 .newbtn{background:none;border:1px solid #3a2a10;color:var(--amber);font-size:11px;font-weight:700;cursor:pointer;padding:5px 10px;border-radius:20px;font-family:var(--font);}
 .newbtn:hover{background:#3a2a10;}
-.steps{display:flex;align-items:center;justify-content:center;padding:7px 16px 5px;flex-shrink:0;}
+.steps{display:flex;align-items:center;padding:6px 14px 5px;flex-shrink:0;gap:8px;border-bottom:1px solid var(--brd);}.step-side{min-width:72px;font-size:11px;}.step-prev{text-align:left;}.step-next{text-align:right;}
 .sd{width:9px;height:9px;border-radius:50%;background:var(--brd);flex-shrink:0;transition:background .2s;}
 .sd.act{background:var(--gold);}
 .sd.don{background:var(--green);cursor:pointer;}
@@ -164,22 +158,6 @@ html,body{height:100%;background:var(--bg);font-family:var(--font);-webkit-font-
 <body>
 <div class="shell">
   <div class="phone">
-    <div class="sync-bar" id="sync-bar">
-      <div class="sync-code">
-        <span style="color:var(--muted);font-size:10px;" id="no-code-label">No active game</span>
-        <span id="code-pill-wrap" style="display:none">
-          <span class="code-pill" onclick="app.copyCode()">
-            <span style="color:var(--muted);font-size:10px;">Code</span>
-            <span class="code-val" id="code-display"></span>
-            <span class="copy-icon">⎘</span>
-          </span>
-        </span>
-      </div>
-      <div class="sync-status">
-        <div class="dot ok" id="sync-dot"></div>
-        <span id="sync-label" style="color:var(--muted);font-size:10px;">Local</span>
-      </div>
-    </div>
     <div id="app" style="display:flex;flex-direction:column;flex:1;overflow:hidden;"></div>
     <div id="modal" class="modal-bg" style="display:none;">
       <div class="modal">
@@ -207,7 +185,6 @@ const CURRENCY      = '₹';
 const MIN_PLAYERS   = 2;
 const LOCAL_KEY     = 'poker_azure_v2';
 
-// ── AZURE CONFIG — fill in after following the setup guide ───────────────
 const AZURE_CONFIG = {
   account:   'pokertracker2024',  // e.g.  pokertracker2024
   container: 'poker-games',                // blob container name
@@ -215,18 +192,89 @@ const AZURE_CONFIG = {
 };
 
 // ══ CloudStore ════════════════════════════════════════════════════════════
+// Tries Azure Blob Storage first. Falls back to localStorage on any error,
+// including unconfigured credentials, CORS failures, or no network.
 class CloudStore {
-  constructor(){this.gameCode=null;this._t=null;}
-  _url(c){const{account,container,sasToken}=AZURE_CONFIG;return`https://${account}.blob.core.windows.net/${container}/game-${c}.json?${sasToken}`;}
-  _makeCode(){const w=['ACE','KING','JACK','QUEEN','SPADE','HEART','FLUSH','RIVER','CHIP','ANTE','BLIND','CALL'];return`${w[Math.floor(Math.random()*w.length)]}-${Math.floor(1000+Math.random()*9000)}`;}
-  async _put(c,d){const r=await fetch(this._url(c),{method:'PUT',headers:{'Content-Type':'application/json','x-ms-blob-type':'BlockBlob'},body:JSON.stringify(d)});if(!r.ok)throw new Error(`PUT ${r.status}`);}
-  async read(c){const r=await fetch(this._url(c));if(!r.ok)throw new Error(`GET ${r.status}`);return r.json();}
-  schedule(data,onStart,onDone,onErr){
+  constructor(){
+    this.gameCode=null;
+    this._t=null;
+    this._mode='unknown'; // 'cloud' | 'local' | 'unknown'
+  }
+
+  // Returns true only if the config has been filled in (not placeholder values)
+  get isConfigured(){
+    const{account,sasToken}=AZURE_CONFIG;
+    return account!=='YOUR_STORAGE_ACCOUNT_NAME'&&sasToken!=='YOUR_SAS_TOKEN'&&account.length>0&&sasToken.length>0;
+  }
+
+  _url(c){
+    const{account,container,sasToken}=AZURE_CONFIG;
+    return`https://${account}.blob.core.windows.net/${container}/game-${c}.json?${sasToken}`;
+  }
+  _makeCode(){
+    const w=['ACE','KING','JACK','QUEEN','SPADE','HEART','FLUSH','RIVER','CHIP','ANTE','BLIND','CALL'];
+    return`${w[Math.floor(Math.random()*w.length)]}-${Math.floor(1000+Math.random()*9000)}`;
+  }
+
+  async _put(c,d){
+    const r=await fetch(this._url(c),{method:'PUT',headers:{'Content-Type':'application/json','x-ms-blob-type':'BlockBlob'},body:JSON.stringify(d)});
+    if(!r.ok)throw new Error(`PUT ${r.status}`);
+  }
+
+  async read(c){
+    // Try cloud first (if configured), fall back to localStorage
+    if(this.isConfigured){
+      try{
+        const r=await fetch(this._url(c));
+        if(r.ok)return r.json();
+        // 404 — blob may not exist in cloud, try localStorage
+        if(r.status===404){
+          const local=GameState.loadLocal();
+          if(local&&local.gameCode===c)return local.data;
+        }
+        throw new Error(`GET ${r.status}`);
+      }catch(e){
+        // Network/CORS error — try localStorage
+        const local=GameState.loadLocal();
+        if(local&&local.gameCode===c)return local.data;
+        throw e;
+      }
+    }
+    // Cloud not configured — look in localStorage
+    const local=GameState.loadLocal();
+    if(local&&local.gameCode===c)return local.data;
+    throw new Error('Not found in local storage');
+  }
+
+  // Saves to Azure if configured and reachable, always saves to localStorage
+  schedule(data,onStart,onDone,onErr,onFallback){
     clearTimeout(this._t);
     this._t=setTimeout(async()=>{
       onStart();
-      try{if(!this.gameCode)this.gameCode=this._makeCode();await this._put(this.gameCode,data);onDone(this.gameCode);}
-      catch(e){console.error('Azure:',e);onErr(e);}
+      // Always persist to localStorage immediately as safety net
+      const localCode=this.gameCode||this._makeCode();
+      if(!this.gameCode)this.gameCode=localCode;
+      try{
+        localStorage.setItem(LOCAL_KEY,JSON.stringify({gameCode:localCode,data}));
+      }catch(e){}
+
+      if(!this.isConfigured){
+        // Azure not configured — localStorage only
+        this._mode='local';
+        onFallback('not configured');
+        return;
+      }
+
+      try{
+        await this._put(this.gameCode,data);
+        this._mode='cloud';
+        onDone(this.gameCode);
+      }catch(e){
+        // Azure failed — we already saved to localStorage above, report fallback
+        console.warn('Azure unavailable, using localStorage:',e.message);
+        this._mode='local';
+        onFallback(e.message);
+      }
     },900);
   }
 }
@@ -256,13 +304,19 @@ class Player {
 
 // An expense (room rent, food, etc.) — optOut lists player IDs who don't pay
 class Expense {
-  constructor(id,name,amount,optOut=[]){this.id=id;this.name=name;this.amount=amount;this.optOut=optOut;}
-  payingCount(players){return players.filter(p=>!this.optOut.includes(p.id)).length;}
-  shareFor(players){const n=this.payingCount(players);return n>0?Math.round(this.amount/n):0;}
+  // splitCount: manual override for how many people split — 0 means "use opt-out list"
+  constructor(id,name,amount,optOut=[],splitCount=0){
+    this.id=id;this.name=name;this.amount=amount;this.optOut=optOut;this.splitCount=splitCount;
+  }
+  effectiveSplitCount(players){
+    if(this.splitCount>0) return this.splitCount;
+    return players.filter(p=>!this.optOut.includes(p.id)).length;
+  }
+  shareFor(players){const n=this.effectiveSplitCount(players);return n>0?Math.round(this.amount/n):0;}
   isOptedOut(pid){return this.optOut.includes(pid);}
   toggleOptOut(pid){this.optOut.includes(pid)?this.optOut=this.optOut.filter(x=>x!==pid):this.optOut.push(pid);}
-  static fromJSON(d){return new Expense(d.id,d.name,d.amount||0,d.optOut||[]);}
-  toJSON(){return{id:this.id,name:this.name,amount:this.amount,optOut:this.optOut};}
+  static fromJSON(d){return new Expense(d.id,d.name,d.amount||0,d.optOut||[],d.splitCount||0);}
+  toJSON(){return{id:this.id,name:this.name,amount:this.amount,optOut:this.optOut,splitCount:this.splitCount};}
 }
 
 class PlayerResult {
@@ -312,11 +366,12 @@ class GameState {
   get totalInPlay(){return this.players.reduce((s,p)=>s+p.totalBought,0);}
   get totalChipsEntered(){return this.players.reduce((s,p)=>s+this.chipsFor(p.id),0);}
   get allChipsFilled(){
-    return this.players.length>0&&this.players.every(p=>{
+    const active=this.activePlayers;
+    return active.length>0&&active.every(p=>{
       const v=this.chipDraft[p.id];return v!==undefined&&v!=='';
     });
   }
-  get filledChipCount(){return this.players.filter(p=>{const v=this.chipDraft[p.id];return v!==undefined&&v!==''}).length;}
+  get filledChipCount(){return this.activePlayers.filter(p=>{const v=this.chipDraft[p.id];return v!==undefined&&v!==''}).length;}
   chipsFor(id){
     const p=this.getPlayer(id);
     if(p&&p.exited) return p.exitChips;
@@ -363,6 +418,7 @@ class GameState {
     if(!e)return;
     if(field==='name')e.name=value;
     if(field==='amount')e.amount=parseInt(value)||0;
+    if(field==='splitCount')e.splitCount=parseInt(value)||0;
   }
   toggleExpenseOptOut(expId,pid){
     const e=this.expenses.find(x=>x.id===expId);
@@ -430,24 +486,37 @@ class BaseRenderer {
   card(inner,style=''){return`<div class="card" style="${style}">${inner}</div>`;}
   pbtn(label,onclick,{disabled=false,color='var(--gold)'}={}){
     const s=color!=='var(--gold)'?`background:${color};color:#0A1A10;`:'';
-    return`<button onclick="${disabled?'':onclick}" class="pbtn${disabled?' off':''}" style="${s}">${label}</button>`;
+    // Always emit onclick so querySelector can find the button for live updates.
+    // The handler itself guards against action when disabled.
+    return`<button onclick="${onclick}" class="pbtn${disabled?' off':''}" style="${s}">${label}</button>`;
   }
   navBar(){
     const i=SCREEN_ORDER.indexOf(this.state.screen);
-    const back=i>0?`<button class="bbtn" onclick="app.goTo('${SCREEN_ORDER[i-1]}')">‹ ${SCREEN_LABELS[SCREEN_ORDER[i-1]]}</button>`:`<button class="bbtn inv">‹</button>`;
+    const prevLabel=i>0?SCREEN_LABELS[SCREEN_ORDER[i-1]]:'';
+    const nextLabel=i<SCREEN_ORDER.length-1?SCREEN_LABELS[SCREEN_ORDER[i+1]]:'';
     const dots=SCREEN_ORDER.map((s,j)=>{
       const cls=j<i?'don':j===i?'act':'';
       const cb=j<i?`onclick="app.goTo('${s}')"` :'';
       const line=j<SCREEN_ORDER.length-1?`<div class="sl ${j<i?'don':''}"></div>`:'';
       return`<div class="sd ${cls}" ${cb}></div>${line}`;
     }).join('');
+    // Sync indicator: dot + code pill shown in nav right side
+    const syncEl=`<div style="display:flex;align-items:center;gap:5px;">
+      <div class="dot ok" id="sync-dot"></div>
+      <span id="no-code-label" style="color:var(--muted);font-size:10px;display:none;"></span>
+      <span id="code-pill-wrap" style="display:none;"><span class="code-pill" onclick="app.copyCode()"><span style="color:var(--muted);font-size:9px;">Code</span><span class="code-val" id="code-display"></span><span style="color:var(--muted);font-size:9px;">⎘</span></span></span>
+    </div>`;
     return`
       <div class="tnav">
-        ${back}
-        <div class="ntc"><div class="ns">Poker Tracker</div><div class="nt">${SCREEN_LABELS[this.state.screen]}</div></div>
         <button class="newbtn" onclick="app.confirmNewGame()">New ↺</button>
+        <div style="font-size:16px;font-weight:700;color:var(--gold);letter-spacing:.3px;">${SCREEN_LABELS[this.state.screen]}</div>
+        ${syncEl}
       </div>
-      <div class="steps">${dots}</div>`;
+      <div class="steps">
+        <span class="step-side step-prev">${prevLabel?`<button class="bbtn" onclick="app.goTo('${SCREEN_ORDER[i-1]}')">‹ ${prevLabel}</button>`:''}</span>
+        <div style="display:flex;align-items:center;gap:0;flex:1;justify-content:center;">${dots}</div>
+        <span class="step-side step-next">${nextLabel?`<span style="color:var(--muted);font-size:11px;white-space:nowrap;">${nextLabel} ›</span>`:''}</span>
+      </div>`;
   }
 }
 
@@ -565,6 +634,8 @@ class ExpensesRenderer extends BaseRenderer {
 
   _expenseBlock(e,idx){
     const share=e.shareFor(this.state.players);
+    const splitN=e.effectiveSplitCount(this.state.players);
+    const usingManual=e.splitCount>0;
     const canDelete=this.state.expenses.length>1;
     const playerRows=this.state.players.map(p=>{
       const optedOut=e.isOptedOut(p.id);
@@ -584,12 +655,21 @@ class ExpensesRenderer extends BaseRenderer {
       <div class="expense-header">
         <div class="f1">
           <input class="inp sm" placeholder="${idx===0?'Room Rent':'Expense name...'}" value="${this.esc(e.name)}"
-            oninput="app.state.updateExpense(${e.id},'name',this.value);app.render()" onblur="app.scheduleSync()" style="margin-bottom:6px;">
-          <div style="display:flex;gap:6px;">
-            <input type="number" class="inp sm f1" placeholder="Amount (₹)" value="${e.amount||''}"
-              oninput="app.state.updateExpense(${e.id},'amount',this.value);app.render()" onblur="app.scheduleSync()">
-            ${e.amount>0?`<div style="font-size:11px;color:var(--muted);padding:8px 0;white-space:nowrap;">÷${e.payingCount(this.state.players)} = ${this.fmt(share)}/player</div>`:''}
+            oninput="app.state.updateExpense(${e.id},'name',this.value)" onblur="app.onExpenseBlur(${e.id})" style="margin-bottom:6px;">
+          <div style="display:flex;gap:6px;align-items:center;">
+            <input type="number" class="inp sm" style="width:90px;flex-shrink:0;" placeholder="Amount ₹" value="${e.amount||''}"
+              oninput="app.state.updateExpense(${e.id},'amount',this.value)" onblur="app.onExpenseBlur(${e.id})">
+            <div style="display:flex;align-items:center;gap:4px;flex:1;">
+              <span style="color:var(--muted);font-size:11px;white-space:nowrap;">÷</span>
+              <input type="number" class="inp sm" style="width:52px;flex-shrink:0;" placeholder="ppl" min="1"
+                value="${usingManual?e.splitCount:''}"
+                oninput="app.state.updateExpense(${e.id},'splitCount',this.value)"
+                onblur="app.onExpenseBlur(${e.id})"
+                title="Number of people splitting. Leave blank to use player list below.">
+              ${e.amount>0?`<span style="color:var(--muted);font-size:11px;white-space:nowrap;">= ${this.fmt(share)}/ea</span>`:''}
+            </div>
           </div>
+          ${usingManual?`<div style="font-size:10px;color:#5a7a5a;margin-top:4px;">÷${e.splitCount} people — toggle players below to opt out</div>`:'<div style="font-size:10px;color:#3a5a3a;margin-top:4px;">Leave blank to split by opt-out list below</div>'}
         </div>
         ${canDelete?`<button class="expense-del" onclick="app.removeExpense(${e.id})" title="Remove">✕</button>`:''}
       </div>
@@ -628,7 +708,7 @@ class SummaryRenderer extends BaseRenderer {
         ${activePlayers.length?this.tag('Enter Remaining Chips'):''}
         ${inputs}
         ${exitedSection}
-        <div style="margin:5px 0 10px;">${this.pbtn('Calculate Payouts','app.doPayout()',{disabled:!this.state.allChipsFilled&&activePlayers.length>0})}</div>
+        <div style="margin:5px 0 10px;"><button onclick="app.doPayout()" id="calc-btn" class="pbtn${(!this.state.allChipsFilled&&activePlayers.length>0)?' off':''}">Calculate Payouts</button></div>
         ${this.state.showPayout?this._payoutSection(results):''}
         <div style="height:10px;"></div>
       </div>
@@ -793,7 +873,7 @@ class PokerApp {
   // Update state immediately (for live re-render of share amounts) but don't sync yet
   updateExpenseDraft(id,field,value){this.state.updateExpense(id,field,value);this.render();}
   // Sync only when the user leaves the field (blur)
-  syncExpense(id){this.scheduleSync();}
+  onExpenseBlur(id){this.render();this.scheduleSync();}
   toggleExpenseOptOut(expId,pid){this.state.toggleExpenseOptOut(expId,pid);this.scheduleSync();this.render();}
 
   // Payout
@@ -809,8 +889,9 @@ class PokerApp {
     const el=document.getElementById('balbar');
     const html=r._balanceBar(b);
     if(el){const t=document.createElement('div');t.innerHTML=html;if(t.firstElementChild)el.replaceWith(t.firstElementChild);}
-    const btn=this._root.querySelector('.pbtn[onclick="app.doPayout()"]');
-    if(btn)btn.className='pbtn'+(this.state.allChipsFilled||this.state.activePlayers.length===0?'':' off');
+    // Find button by text content now that onclick is always set
+    const btn=document.getElementById('calc-btn');
+    if(btn){const enabled=this.state.allChipsFilled||this.state.activePlayers.length===0;btn.className='pbtn'+(enabled?'':' off');}
   }
 
   // Resume
@@ -836,19 +917,17 @@ class PokerApp {
     this._syncBar('syncing');
     this.cloud.schedule(
       this.state.toJSON(),
-      ()=>this._syncBar('syncing'),
-      (id)=>{this.state.saveLocal(id);this._syncBar('ok');this._refreshCodeDisplay();},
-      ()=>this._syncBar('err'),
+      ()   => this._syncBar('syncing'),
+      (id) => { this.state.saveLocal(id); this._syncBar('ok'); this._refreshCodeDisplay(); },
+      ()   => this._syncBar('err'),
     );
   }
 
   _syncBar(status){
-    const dot=document.getElementById('sync-dot'),lbl=document.getElementById('sync-label'),bar=document.getElementById('sync-bar');
+    const dot=document.getElementById('sync-dot');
     if(!dot)return;
-    const m={ok:{cls:'ok',txt:'Saved'},syncing:{cls:'spin',txt:'Saving…'},err:{cls:'err',txt:'Sync error'},none:{cls:'ok',txt:'Local'}};
-    const s=m[status]||m.none;
-    dot.className='dot '+s.cls;if(lbl)lbl.textContent=s.txt;
-    if(bar)bar.className='sync-bar'+(status==='err'?' err':'');
+    const cls={cloud:'ok',syncing:'spin',err:'err',local:'ok',none:'ok',ok:'ok'};
+    dot.className='dot '+(cls[status]||'ok');
   }
 
   _refreshCodeDisplay(){
