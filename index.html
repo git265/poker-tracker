@@ -382,6 +382,7 @@ class GameState {
     this.paidTransfers={};  // key: "from→to", value: true/false            // rupees per 1 chip
     this.expandedPlayer=null;
     this.exitingPlayer=null;
+    this.showResumeInput=false;
   }
   reset(){this._nid=1;this._init();}
   nextId(){return this._nid++;}
@@ -539,18 +540,22 @@ class BaseRenderer {
     const syncEl=`<div style="display:flex;align-items:center;gap:5px;">
       <div class="dot ok" id="sync-dot"></div>
       <span id="no-code-label" style="color:var(--muted);font-size:12px;display:none;"></span>
-      <span id="code-pill-wrap" style="display:none;"><span class="code-pill" onclick="app.copyCode()"><span style="color:var(--muted);font-size:11px;">Code</span><span class="code-val" id="code-display"></span><span style="color:var(--muted);font-size:11px;">⎘</span></span></span>
+      <span id="code-pill-wrap" style="display:none;"><span class="code-pill" onclick="app.copyCode()"><span style="color:var(--muted);font-size:11px;">Code</span><span class="code-val" id="code-display"></span><span style="color:var(--muted);font-size:11px;">&#x2398;</span></span></span>
     </div>`;
+    const isSetup=this.state.screen===SCREENS.SETUP;
+    const resumeOpen=isSetup&&this.state.showResumeInput;
+    const resumeBtn=isSetup?`<button class="newbtn" onclick="app.toggleResumeInput()" style="color:var(--gold);margin-right:4px;">${resumeOpen?'&#x2715;':'&#x2601; Resume'}</button>`:'';
+    const resumeInline=resumeOpen?`<div style="display:flex;align-items:center;gap:5px;flex:1;min-width:0;"><input class="resume-inp" id="resume-code" placeholder="Game code&hellip;" autocomplete="off" maxlength="25" style="flex:1;min-width:0;padding:6px 9px;font-size:14px;"><button class="sbtn green" onclick="app.resumeByCode()" style="padding:6px 11px;font-size:13px;white-space:nowrap;">Load &rarr;</button></div>`:( prevLabel?`<button class="bbtn" onclick="app.goTo('${SCREEN_ORDER[i-1]}')">&#x2039; ${prevLabel}</button>`:'');
     return`
       <div class="tnav">
-        <button class="newbtn" onclick="app.confirmNewGame()">New ↺</button>
+        <button class="newbtn" onclick="app.confirmNewGame()">New &#x21BA;</button>
         <div style="font-size:18px;font-weight:700;color:var(--gold);letter-spacing:.3px;">${SCREEN_LABELS[this.state.screen]}</div>
-        ${syncEl}
+        <div style="display:flex;align-items:center;gap:5px;">${resumeBtn}${syncEl}</div>
       </div>
       <div class="steps">
-        <span class="step-side step-prev">${prevLabel?`<button class="bbtn" onclick="app.goTo('${SCREEN_ORDER[i-1]}')">‹ ${prevLabel}</button>`:''}</span>
-        <div style="display:flex;align-items:center;gap:0;flex:1;justify-content:center;">${dots}</div>
-        <span class="step-side step-next">${nextLabel?`<span style="color:var(--muted);font-size:13px;white-space:nowrap;">${nextLabel} ›</span>`:''}</span>
+        <span class="step-side step-prev" style="min-width:${resumeOpen?'0':'72px'};${resumeOpen?'flex:1;display:flex;':''}align-items:center;">${resumeInline}</span>
+        <div style="display:flex;align-items:center;gap:0;${resumeOpen?'flex-shrink:0;':'flex:1;'}justify-content:center;">${dots}</div>
+        <span class="step-side step-next" style="min-width:${resumeOpen?'0':'72px'};">${!resumeOpen&&nextLabel?`<span style="color:var(--muted);font-size:13px;white-space:nowrap;">${nextLabel} &rsaquo;</span>`:''}</span>
       </div>`;
   }
 }
@@ -569,13 +574,6 @@ class SetupRenderer extends BaseRenderer {
     return`
       ${this.navBar()}
       <div class="body">
-        <div class="resume-card">
-          <div class="resume-title">☁ Resume a game from another device</div>
-          <div class="resume-row">
-            <input class="resume-inp" id="resume-code" placeholder="Enter game code..." autocomplete="off" maxlength="25">
-            <button class="sbtn green" onclick="app.resumeByCode()" style="padding:8px 13px;">Load →</button>
-          </div>
-        </div>
         <div class="row" style="margin-bottom:12px;">
           <input id="ni" class="inp f1" placeholder="Player name..." value="${this.esc(this.state.newName)}" autocomplete="off">
           <button onclick="app.addPlayer()" style="padding:9px 15px;border-radius:9px;border:none;background:${this.state.newName.trim()?'#2A5A35':'#1A2A1E'};color:var(--gold);font-size:21px;cursor:pointer;flex-shrink:0;margin-left:8px;">+</button>
@@ -586,7 +584,7 @@ class SetupRenderer extends BaseRenderer {
         <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px;background:var(--bg2);border:1px solid var(--brd);border-radius:11px;padding:9px 12px;">
           <div style="font-size:14px;color:var(--muted);flex:1;">Rupees per chip (conversion rate)</div>
           <input id="chip-rate" type="number" min="0.01" step="0.01" class="inp sm" style="width:72px;text-align:right;"
-            placeholder="1" value="${this.state.chipRate!==1?this.state.chipRate:''}"
+            placeholder=".5" value="${this.state.chipRate!==.5?this.state.chipRate:''}"
             oninput="app.onChipRateInput(this.value)" onblur="app.onChipRateBlur()">
           <div style="font-size:14px;color:var(--muted);">₹/chip</div>
         </div>
@@ -996,6 +994,7 @@ class PokerApp {
   }
 
   // Resume
+  toggleResumeInput(){this.state.showResumeInput=!this.state.showResumeInput;this.render();if(this.state.showResumeInput)setTimeout(()=>{const inp=document.getElementById('resume-code');if(inp)inp.focus();},50);}
   async resumeByCode(){
     const inp=document.getElementById('resume-code');
     const code=(inp?inp.value.trim():'');
@@ -1004,7 +1003,7 @@ class PokerApp {
     try{
       const data=await this.cloud.read(code);
       this.state.fromJSON(data);this.cloud.gameCode=code;
-      this.state.saveLocal(code);this._syncBar('ok');this.render();this.toast('Game resumed ✓');
+      this.state.saveLocal(code);this.state.showResumeInput=false;this._syncBar('ok');this.render();this.toast('Game resumed ✓');
     }catch(e){this.toast('Code not found — try again','err');}
   }
 
@@ -1053,7 +1052,7 @@ class PokerApp {
   confirmNewGame(){document.getElementById('modal').style.display='flex';}
   hideModal(){document.getElementById('modal').style.display='none';}
   resetGame(){
-    this.state.reset();this.cloud.gameCode=null;
+    this.state.reset();this.cloud.gameCode=null;this.state.showResumeInput=false;
     try{localStorage.removeItem(LOCAL_KEY);}catch(e){}
     this._syncBar('none');this.render();
   }
