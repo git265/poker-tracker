@@ -5,16 +5,16 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-<meta name="theme-color" content="#0A1A10">
+<meta name="theme-color" content="#1c1917">
 <title>Poker Tracker</title>
 <style>
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0;}
 :root{
-  --bg:#0A1A10;--bg2:#0F2416;--bg3:#071210;
-  --brd:#1E3A25;--brd2:#2A5A35;
-  --gold:#E9D87A;--green:#4A9A5A;--green2:#6FD46F;--green3:#2A5A35;
-  --muted:#4A7A55;--text:#C8E8C8;--red:#E05C5C;--amber:#E9A23B;
-  --font:'Georgia','Times New Roman',serif;
+  --bg:#1c1917;--bg2:#242019;--bg3:#141210;
+  --brd:#2e2b27;--brd2:#4a4540;
+  --gold:#e8a87c;--green:#6b9e6b;--green2:#8dbf8d;--green3:#3a5a3a;
+  --muted:#6e6962;--text:#e5e2de;--red:#d4655a;--amber:#d4915a;
+  --font:-apple-system,BlinkMacSystemFont,'Segoe UI','Helvetica Neue',Arial,sans-serif;
 }
 html,body{height:100%;background:var(--bg);font-family:var(--font);-webkit-font-smoothing:antialiased;overscroll-behavior:none;}
 .shell{display:flex;justify-content:center;min-height:100vh;background:var(--bg);}
@@ -27,19 +27,19 @@ html,body{height:100%;background:var(--bg);font-family:var(--font);-webkit-font-
 .dot.err{background:var(--red);}
 @keyframes pulse{0%,100%{opacity:1}50%{opacity:.3}}
 /* Code pill (inline in nav) */
-.code-pill{background:#0f2a14;border:1px solid var(--brd2);border-radius:20px;padding:2px 9px;cursor:pointer;display:inline-flex;align-items:center;gap:4px;vertical-align:middle;}
-.code-pill:hover{background:#1a3a20;}
-.code-val{color:var(--gold);font-weight:700;letter-spacing:1.2px;font-size:11px;}
+.code-pill{background:var(--bg2);border:1px solid var(--brd2);border-radius:20px;padding:2px 9px;cursor:pointer;display:inline-flex;align-items:center;gap:4px;vertical-align:middle;}
+.code-pill:hover{background:var(--brd);}
+.code-val{color:var(--gold);font-weight:700;letter-spacing:1.2px;font-size:14px;}
 
 /* Nav */
 .tnav{display:flex;align-items:center;justify-content:space-between;padding:10px 16px 8px;border-bottom:1px solid var(--brd);flex-shrink:0;}
-.bbtn{background:none;border:none;color:var(--green);font-size:13px;cursor:pointer;padding:5px 8px;border-radius:8px;font-family:var(--font);}
+.bbtn{background:none;border:none;color:var(--green);font-size:16px;cursor:pointer;padding:5px 8px;border-radius:8px;font-family:var(--font);}
 .bbtn:hover{background:var(--brd);}
 .bbtn.inv{visibility:hidden;pointer-events:none;}
 
-.newbtn{background:none;border:1px solid #3a2a10;color:var(--amber);font-size:11px;font-weight:700;cursor:pointer;padding:5px 10px;border-radius:20px;font-family:var(--font);}
-.newbtn:hover{background:#3a2a10;}
-.steps{display:flex;align-items:center;padding:6px 14px 5px;flex-shrink:0;gap:8px;border-bottom:1px solid var(--brd);}.step-side{min-width:72px;font-size:11px;}.step-prev{text-align:left;}.step-next{text-align:right;}
+.newbtn{background:none;border:1px solid var(--brd2);color:var(--amber);font-size:14px;font-weight:700;cursor:pointer;padding:5px 10px;border-radius:20px;font-family:var(--font);}
+.newbtn:hover{background:var(--bg2);}
+.steps{display:flex;align-items:center;padding:6px 14px 5px;flex-shrink:0;gap:8px;border-bottom:1px solid var(--brd);}.step-side{min-width:72px;font-size:14px;}.step-prev{text-align:left;}.step-next{text-align:right;}
 .sd{width:9px;height:9px;border-radius:50%;background:var(--brd);flex-shrink:0;transition:background .2s;}
 .sd.act{background:var(--gold);}
 .sd.don{background:var(--green);cursor:pointer;}
@@ -61,98 +61,108 @@ html,body{height:100%;background:var(--bg);font-family:var(--font);-webkit-font-
 .prow-accent{width:4px;flex-shrink:0;align-self:stretch;}
 .prow-main{flex:1;padding:8px 10px;min-width:0;}
 .prow-top{display:flex;align-items:center;gap:8px;}
-.prow-name{font-size:14px;font-weight:700;color:var(--text);flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
-.prow-stats{font-size:11px;color:var(--muted);white-space:nowrap;}
+.prow-name{font-size:17px;font-weight:700;color:var(--text);flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.prow-stats{font-size:14px;color:var(--muted);white-space:nowrap;}
 .prow-btns{display:flex;align-items:center;gap:0;flex-shrink:0;}
-.prow-add{padding:8px 12px;background:none;border:none;border-left:1px solid var(--brd);color:var(--green2);font-size:18px;cursor:pointer;font-family:var(--font);transition:background .15s;}
+.prow-add{padding:8px 12px;background:none;border:none;border-left:1px solid var(--brd);color:var(--green2);font-size:21px;cursor:pointer;font-family:var(--font);transition:background .15s;}
 .prow-add:hover{background:var(--brd);}
-.prow-exit{padding:8px 10px;background:none;border:none;border-left:1px solid var(--brd);color:#4a5a4a;font-size:11px;cursor:pointer;font-family:var(--font);transition:background .15s;white-space:nowrap;}
-.prow-exit:hover{background:#2a0a0a;color:var(--red);}
-.prow-expand{padding:8px 8px;background:none;border:none;border-left:1px solid var(--brd);color:var(--muted);font-size:11px;cursor:pointer;}
+.prow-exit{padding:8px 10px;background:none;border:none;border-left:1px solid var(--brd);color:var(--muted);font-size:14px;cursor:pointer;font-family:var(--font);transition:background .15s;white-space:nowrap;}
+.prow-exit:hover{background:var(--bg3);color:var(--red);}
+.prow-expand{padding:8px 8px;background:none;border:none;border-left:1px solid var(--brd);color:var(--muted);font-size:14px;cursor:pointer;}
 
 /* Buy pills strip (inside expanded row) */
 .prow-detail{padding:0 10px 8px 14px;border-top:1px solid var(--brd);}
 .strip{display:flex;flex-wrap:wrap;gap:3px;padding:6px 0 6px;}
-.pill{display:inline-flex;align-items:center;gap:2px;background:var(--bg3);border:1px solid var(--brd);border-radius:16px;padding:2px 8px 2px 7px;font-size:12px;}
-.px{color:#4a5a4a;font-size:10px;cursor:pointer;padding-left:2px;}
+.pill{display:inline-flex;align-items:center;gap:2px;background:var(--bg3);border:1px solid var(--brd);border-radius:16px;padding:2px 8px 2px 7px;font-size:15px;}
+.px{color:#4a5a4a;font-size:13px;cursor:pointer;padding-left:2px;}
 .px:hover{color:var(--red);}
 .buy-inp-row{display:flex;gap:6px;}
 
 /* Exit inline panel */
-.exit-panel{background:#1a0a0a;border:1px solid #3a1a1a;border-radius:8px;padding:8px 10px;margin:6px 0 0;display:flex;flex-direction:column;gap:6px;}
-.exit-label{font-size:11px;color:#9a4a4a;}
+.exit-panel{background:var(--bg3);border:1px solid var(--brd);border-radius:8px;padding:8px 10px;margin:6px 0 0;display:flex;flex-direction:column;gap:6px;}
+.exit-label{font-size:14px;color:var(--muted);}
 .exit-row{display:flex;gap:6px;align-items:center;}
 
 /* Inputs & buttons */
-.inp{width:100%;padding:9px 11px;border-radius:9px;border:1px solid var(--brd);background:var(--bg3);color:var(--text);font-size:14px;outline:none;font-family:var(--font);-webkit-appearance:none;transition:border-color .15s;}
-.inp::placeholder{color:var(--green3);}
+.inp{width:100%;padding:9px 11px;border-radius:9px;border:1px solid var(--brd);background:var(--bg3);color:var(--text);font-size:17px;outline:none;font-family:var(--font);-webkit-appearance:none;transition:border-color .15s;}
+.inp::placeholder{color:var(--muted);opacity:.6;}
 .inp:focus{border-color:var(--brd2);}
-.inp.sm{padding:7px 10px;font-size:13px;}
-.pbtn{width:100%;padding:13px;border-radius:13px;border:none;background:var(--gold);color:var(--bg);font-size:14px;font-weight:700;cursor:pointer;margin-bottom:6px;font-family:var(--font);transition:transform .1s;}
+.inp.sm{padding:7px 10px;font-size:16px;}
+.pbtn{width:100%;padding:13px;border-radius:13px;border:none;background:var(--gold);color:var(--bg);font-size:17px;font-weight:700;cursor:pointer;margin-bottom:6px;font-family:var(--font);transition:transform .1s;}
 .pbtn:active{transform:scale(.98);}
 .pbtn.off{background:var(--brd);color:var(--muted);cursor:not-allowed;}
 .pbtn.off:active{transform:none;}
-.sbtn{padding:7px 13px;border-radius:9px;border:none;font-size:13px;font-weight:700;cursor:pointer;font-family:var(--font);white-space:nowrap;}
-.sbtn.green{background:var(--green3);color:var(--gold);}
-.sbtn.green:hover{background:#3a7a45;}
-.sbtn.red{background:#3a1a1a;color:var(--red);border:1px solid #5a2a2a;}
-.sbtn.red:hover{background:#4a2a2a;}
+.sbtn{padding:7px 13px;border-radius:9px;border:none;font-size:16px;font-weight:700;cursor:pointer;font-family:var(--font);white-space:nowrap;}
+.sbtn.green{background:var(--brd2);color:var(--text);}
+.sbtn.green:hover{background:var(--green);}
+.sbtn.red{background:var(--bg3);color:var(--red);border:1px solid var(--brd);}
+.sbtn.red:hover{background:var(--brd);}
 
 /* Resume card */
-.resume-card{background:#071e10;border:1px solid var(--brd2);border-radius:12px;padding:12px 13px;margin-bottom:12px;}
-.resume-title{color:var(--gold);font-size:12px;font-weight:700;margin-bottom:8px;}
+.resume-card{background:var(--bg2);border:1px solid var(--brd2);border-radius:12px;padding:12px 13px;margin-bottom:12px;}
+.resume-title{color:var(--gold);font-size:15px;font-weight:700;margin-bottom:8px;}
 .resume-row{display:flex;gap:7px;}
-.resume-inp{flex:1;padding:8px 11px;border-radius:9px;border:1px solid var(--brd);background:var(--bg3);color:var(--text);font-size:13px;outline:none;font-family:var(--font);letter-spacing:1px;text-transform:uppercase;}
-.resume-inp::placeholder{color:var(--green3);letter-spacing:0;text-transform:none;}
+.resume-inp{flex:1;padding:8px 11px;border-radius:9px;border:1px solid var(--brd);background:var(--bg3);color:var(--text);font-size:16px;outline:none;font-family:var(--font);letter-spacing:1px;text-transform:uppercase;}
+.resume-inp::placeholder{color:var(--muted);opacity:.6;letter-spacing:0;text-transform:none;}
 
 /* Expense section */
 .expense-block{background:var(--bg2);border:1px solid var(--brd);border-radius:12px;margin-bottom:10px;overflow:hidden;}
 .expense-header{display:flex;align-items:center;padding:10px 12px;gap:8px;}
-.expense-label{flex:1;font-size:13px;font-weight:700;color:var(--text);}
-.expense-amount{font-size:13px;color:var(--gold);font-weight:700;}
-.expense-del{background:none;border:none;color:#4a5a4a;font-size:14px;cursor:pointer;padding:2px 6px;}
+.expense-label{flex:1;font-size:16px;font-weight:700;color:var(--text);}
+.expense-amount{font-size:16px;color:var(--gold);font-weight:700;}
+.expense-del{background:none;border:none;color:#4a5a4a;font-size:17px;cursor:pointer;padding:2px 6px;}
 .expense-del:hover{color:var(--red);}
 .expense-inputs{padding:0 12px 10px;display:flex;gap:7px;}
 .expense-players{border-top:1px solid var(--brd);}
 .expense-player{display:flex;align-items:center;gap:10px;padding:7px 12px;border-bottom:1px solid var(--brd);}
 .expense-player:last-child{border-bottom:none;}
 .exp-dot{width:8px;height:8px;border-radius:50%;flex-shrink:0;}
-.exp-pname{flex:1;font-size:13px;color:var(--text);}
-.exp-share{font-size:11px;color:var(--muted);}
-.opt-btn{padding:3px 10px;border-radius:16px;font-size:11px;font-weight:700;cursor:pointer;font-family:var(--font);transition:all .15s;}
+.exp-pname{flex:1;font-size:16px;color:var(--text);}
+.exp-share{font-size:14px;color:var(--muted);}
+.opt-btn{padding:3px 10px;border-radius:16px;font-size:14px;font-weight:700;cursor:pointer;font-family:var(--font);transition:all .15s;}
 .opt-btn.paying{border:1.5px solid var(--brd2);background:transparent;color:var(--green);}
-.opt-btn.optout{border:1.5px solid #5a2a2a;background:#1a0707;color:var(--red);}
-.add-expense-btn{display:flex;align-items:center;gap:8px;padding:10px 13px;background:var(--bg2);border:1px dashed var(--brd2);border-radius:12px;cursor:pointer;color:var(--green);font-size:13px;font-family:var(--font);width:100%;margin-bottom:10px;}
-.add-expense-btn:hover{background:#0a2a14;}
+.opt-btn.optout{border:1.5px solid var(--brd);background:var(--bg3);color:var(--red);}
+.add-expense-btn{display:flex;align-items:center;gap:8px;padding:10px 13px;background:var(--bg2);border:1px dashed var(--brd2);border-radius:12px;cursor:pointer;color:var(--green);font-size:16px;font-family:var(--font);width:100%;margin-bottom:10px;}
+.add-expense-btn:hover{background:var(--brd);}
 
 /* Misc */
 .row{display:flex;align-items:center;gap:10px;}
 .f1{flex:1;min-width:0;}
-.tag{font-size:10px;letter-spacing:1px;text-transform:uppercase;color:var(--muted);margin-bottom:5px;}
+.tag{font-size:13px;letter-spacing:1px;text-transform:uppercase;color:var(--muted);margin-bottom:5px;}
 .balbar{border-radius:10px;padding:9px 12px;margin-bottom:11px;display:flex;align-items:center;gap:10px;}
-.balbar.ok{background:#0a2a14;border:1px solid var(--brd2);}
-.balbar.bad{background:#2a0a0a;border:1px solid #5a2a2a;}
-.balbar.partial{background:#1a1a0a;border:1px solid #5a4a10;}
+.balbar.ok{background:var(--bg2);border:1px solid var(--brd2);}
+.balbar.bad{background:var(--bg3);border:1px solid var(--red);}
+.balbar.partial{background:var(--bg3);border:1px solid var(--amber);}
 .stat-grid{display:grid;grid-template-columns:1fr 1fr;gap:7px;margin-bottom:11px;}
 .stat-card{background:var(--bg3);border:1px solid var(--brd);border-radius:11px;padding:9px 11px;}
-.stat-val{color:var(--gold);font-size:20px;font-weight:700;margin-top:2px;}
+.stat-val{color:var(--gold);font-size:23px;font-weight:700;margin-top:2px;}
 
 /* Exited badge */
-.exited-badge{display:inline-block;font-size:9px;font-weight:700;letter-spacing:.5px;text-transform:uppercase;padding:1px 7px;border-radius:10px;background:#1a0a0a;color:#6a3a3a;border:1px solid #3a1a1a;margin-left:5px;vertical-align:middle;}
+.exited-badge{display:inline-block;font-size:12px;font-weight:700;letter-spacing:.5px;text-transform:uppercase;padding:1px 7px;border-radius:10px;background:#2a1f1a;color:#8a5a4a;border:1px solid #4a3028;margin-left:5px;vertical-align:middle;}
+
+/* Paid toggle on transfer cards */
+.paid-toggle{display:flex;align-items:center;gap:6px;padding:4px 10px 4px 12px;border-top:1px solid var(--brd);cursor:pointer;user-select:none;transition:background .15s;}
+.paid-toggle:hover{background:var(--brd);}
+.paid-check{width:18px;height:18px;border-radius:50%;border:2px solid var(--brd2);display:flex;align-items:center;justify-content:center;flex-shrink:0;transition:all .15s;font-size:12px;}
+.paid-check.done{background:var(--green2);border-color:var(--green2);color:var(--bg);}
+.paid-label{font-size:14px;color:var(--muted);}
+.paid-label.done{color:var(--green2);}
+.transfer-card{background:var(--bg2);border:1px solid var(--brd2);border-radius:12px;margin-bottom:8px;overflow:hidden;}
+.transfer-card.paid-card{opacity:.5;}
 
 /* Toast */
-.toast{position:absolute;bottom:80px;left:50%;transform:translateX(-50%);background:#1a3a1a;border:1px solid var(--brd2);color:var(--green2);font-size:12px;padding:7px 16px;border-radius:18px;z-index:300;white-space:nowrap;animation:fadeup .25s ease;pointer-events:none;}
-.toast.err{background:#3a1a1a;border-color:#5a2a2a;color:var(--red);}
+.toast{position:absolute;bottom:80px;left:50%;transform:translateX(-50%);background:#1a3a1a;border:1px solid var(--brd2);color:var(--green2);font-size:15px;padding:7px 16px;border-radius:18px;z-index:300;white-space:nowrap;animation:fadeup .25s ease;pointer-events:none;}
+.toast.err{background:var(--bg2);border-color:var(--red);color:var(--red);}
 @keyframes fadeup{from{opacity:0;transform:translateX(-50%) translateY(8px)}to{opacity:1;transform:translateX(-50%) translateY(0)}}
 
 /* Modal */
 .modal-bg{position:absolute;inset:0;background:rgba(0,0,0,.8);display:flex;align-items:center;justify-content:center;z-index:200;}
 .modal{background:var(--bg2);border:1px solid var(--brd2);border-radius:18px;padding:22px 18px;margin:16px;width:calc(100% - 32px);}
-.modal h3{color:var(--gold);font-size:16px;margin-bottom:7px;text-align:center;}
-.modal p{color:#7aaa7a;font-size:13px;margin-bottom:18px;text-align:center;line-height:1.5;}
+.modal h3{color:var(--gold);font-size:19px;margin-bottom:7px;text-align:center;}
+.modal p{color:var(--muted);font-size:16px;margin-bottom:18px;text-align:center;line-height:1.5;}
 .mrow{display:flex;gap:9px;}
-.mok{flex:1;padding:12px;border-radius:11px;border:none;background:var(--red);color:#fff;font-size:14px;font-weight:700;cursor:pointer;font-family:var(--font);}
-.mno{flex:1;padding:12px;border-radius:11px;border:1.5px solid var(--brd);background:transparent;color:var(--green);font-size:14px;cursor:pointer;font-family:var(--font);}
+.mok{flex:1;padding:12px;border-radius:11px;border:none;background:var(--red);color:#fff;font-size:17px;font-weight:700;cursor:pointer;font-family:var(--font);}
+.mno{flex:1;padding:12px;border-radius:11px;border:1.5px solid var(--brd);background:transparent;color:var(--green);font-size:17px;cursor:pointer;font-family:var(--font);}
 </style>
 </head>
 <body>
@@ -320,17 +330,18 @@ class Expense {
 }
 
 class PlayerResult {
-  constructor({id,name,color,bought,chipsRemaining,expenseShare,exited}){
+  constructor({id,name,color,bought,chipsRemaining,expenseShare,exited,rate}){
     this.id=id;this.name=name;this.color=color;
     this.bought=bought;this.chipsRemaining=chipsRemaining;
-    this.expenseShare=expenseShare;this.exited=exited;
-    this.net=chipsRemaining-bought-expenseShare;
+    this.expenseShare=expenseShare;this.exited=exited;this.rate=rate||1;
+    this.netChips=chipsRemaining-bought;
+    this.netRupees=Math.round(this.netChips*this.rate)-expenseShare;
     Object.freeze(this);
   }
-  get isWinner(){return this.net>0;}
-  get isLoser(){return this.net<0;}
+  get isWinner(){return this.netRupees>0;}
+  get isLoser(){return this.netRupees<0;}
   get label(){return this.isWinner?'Winner':this.isLoser?'Loser':'Even';}
-  get netFormatted(){return(this.isWinner?'+':'')+this.net.toLocaleString();}
+  get netFormatted(){const s=this.netRupees>=0?'+':'';return s+'₹'+Math.abs(this.netRupees).toLocaleString();}
   get netColor(){return this.isWinner?'#6FD46F':this.isLoser?'#E05C5C':'#888';}
   get labelColor(){return this.isWinner?'#4A9A5A':this.isLoser?'#9A4A4A':'#4A7A55';}
   get borderColor(){return this.isWinner?'#2A5A35':this.isLoser?'#5A2A2A':'#1E3A25';}
@@ -355,8 +366,10 @@ class GameState {
     this.buyDraft={};
     this.chipDraft={};
     this.showPayout=false;
-    this.expandedPlayer=null; // which player row is expanded in game screen
-    this.exitingPlayer=null;  // which player is showing exit panel
+    this.chipRate=1;
+    this.paidTransfers={};  // key: "from→to", value: true/false            // rupees per 1 chip
+    this.expandedPlayer=null;
+    this.exitingPlayer=null;
   }
   reset(){this._nid=1;this._init();}
   nextId(){return this._nid++;}
@@ -430,7 +443,7 @@ class GameState {
       _nid:this._nid,screen:this.screen,
       players:this.players.map(p=>p.toJSON()),
       expenses:this.expenses.map(e=>e.toJSON()),
-      buyDraft:this.buyDraft,chipDraft:this.chipDraft,showPayout:this.showPayout,
+      buyDraft:this.buyDraft,chipDraft:this.chipDraft,showPayout:this.showPayout,chipRate:this.chipRate,paidTransfers:this.paidTransfers,
     };
   }
   fromJSON(d){
@@ -438,7 +451,7 @@ class GameState {
     this.players=(d.players||[]).map(Player.fromJSON);
     this.expenses=(d.expenses||[{id:1,name:'Room Rent',amount:0,optOut:[]}]).map(Expense.fromJSON);
     this.buyDraft=d.buyDraft||{};this.chipDraft=d.chipDraft||{};
-    this.showPayout=d.showPayout||false;
+    this.showPayout=d.showPayout||false;this.chipRate=d.chipRate||1;this.paidTransfers=d.paidTransfers||{};
   }
   saveLocal(gameCode){try{localStorage.setItem(LOCAL_KEY,JSON.stringify({gameCode,data:this.toJSON()}));}catch(e){}}
   static loadLocal(){try{const r=localStorage.getItem(LOCAL_KEY);return r?JSON.parse(r):null;}catch(e){return null;}}
@@ -452,12 +465,12 @@ class GameEngine {
       bought:p.totalBought,
       chipsRemaining:state.chipsFor(p.id),
       expenseShare:state.totalExpenseShareFor(p.id),
-      exited:p.exited,
+      exited:p.exited,rate:state.chipRate,
     }));
   }
   static computeTransfers(results){
-    const d=results.filter(r=>r.isLoser).map(r=>({r,owe:-r.net})).sort((a,b)=>b.owe-a.owe);
-    const c=results.filter(r=>r.isWinner).map(r=>({r,owed:r.net})).sort((a,b)=>b.owed-a.owed);
+    const d=results.filter(r=>r.isLoser).map(r=>({r,owe:-r.netRupees})).sort((a,b)=>b.owe-a.owe);
+    const c=results.filter(r=>r.isWinner).map(r=>({r,owed:r.netRupees})).sort((a,b)=>b.owed-a.owed);
     const T=[];
     while(d.length&&c.length){
       const amt=Math.min(d[0].owe,c[0].owed);
@@ -480,7 +493,16 @@ class GameEngine {
 // ══ BaseRenderer ══════════════════════════════════════════════════════════
 class BaseRenderer {
   constructor(state){this.state=state;}
-  fmt(n){return CURRENCY+Math.abs(n).toLocaleString();}
+  fmt(n){return CURRENCY+Math.abs(n).toLocaleString();}         // legacy – used for expenses (already in ₹)
+  fmtC(n){return Math.abs(n).toLocaleString()+' chips';}        // chip value (no conversion)
+  fmtR(n,rate){                                                  // chips → ₹
+    const r=rate||1;
+    return CURRENCY+Math.round(Math.abs(n)*r).toLocaleString();
+  }
+  netR(n,rate){                                                  // signed chips → ₹ string
+    const r=rate||1; const v=Math.round(n*r);
+    return (v>=0?'+':'')+CURRENCY+Math.abs(v).toLocaleString();
+  }
   esc(s){return(s||'').replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/</g,'&lt;');}
   tag(t){return`<div class="tag">${t}</div>`;}
   card(inner,style=''){return`<div class="card" style="${style}">${inner}</div>`;}
@@ -503,19 +525,19 @@ class BaseRenderer {
     // Sync indicator: dot + code pill shown in nav right side
     const syncEl=`<div style="display:flex;align-items:center;gap:5px;">
       <div class="dot ok" id="sync-dot"></div>
-      <span id="no-code-label" style="color:var(--muted);font-size:10px;display:none;"></span>
-      <span id="code-pill-wrap" style="display:none;"><span class="code-pill" onclick="app.copyCode()"><span style="color:var(--muted);font-size:9px;">Code</span><span class="code-val" id="code-display"></span><span style="color:var(--muted);font-size:9px;">⎘</span></span></span>
+      <span id="no-code-label" style="color:var(--muted);font-size:13px;display:none;"></span>
+      <span id="code-pill-wrap" style="display:none;"><span class="code-pill" onclick="app.copyCode()"><span style="color:var(--muted);font-size:12px;">Code</span><span class="code-val" id="code-display"></span><span style="color:var(--muted);font-size:12px;">⎘</span></span></span>
     </div>`;
     return`
       <div class="tnav">
         <button class="newbtn" onclick="app.confirmNewGame()">New ↺</button>
-        <div style="font-size:16px;font-weight:700;color:var(--gold);letter-spacing:.3px;">${SCREEN_LABELS[this.state.screen]}</div>
+        <div style="font-size:19px;font-weight:700;color:var(--gold);letter-spacing:.3px;">${SCREEN_LABELS[this.state.screen]}</div>
         ${syncEl}
       </div>
       <div class="steps">
         <span class="step-side step-prev">${prevLabel?`<button class="bbtn" onclick="app.goTo('${SCREEN_ORDER[i-1]}')">‹ ${prevLabel}</button>`:''}</span>
         <div style="display:flex;align-items:center;gap:0;flex:1;justify-content:center;">${dots}</div>
-        <span class="step-side step-next">${nextLabel?`<span style="color:var(--muted);font-size:11px;white-space:nowrap;">${nextLabel} ›</span>`:''}</span>
+        <span class="step-side step-next">${nextLabel?`<span style="color:var(--muted);font-size:14px;white-space:nowrap;">${nextLabel} ›</span>`:''}</span>
       </div>`;
   }
 }
@@ -527,10 +549,10 @@ class SetupRenderer extends BaseRenderer {
     const list=ps.map((p,i)=>this.card(`
       <div class="row">
         <div style="width:10px;height:10px;border-radius:50%;background:${p.color};flex-shrink:0;"></div>
-        <div class="f1"><div style="color:var(--text);font-size:14px;font-weight:700;">${this.esc(p.name)}</div><div style="color:var(--muted);font-size:11px;">Player ${i+1}</div></div>
-        <button onclick="app.removePlayer(${p.id})" style="background:none;border:none;color:#4a5a4a;font-size:16px;cursor:pointer;padding:4px;">✕</button>
+        <div class="f1"><div style="color:var(--text);font-size:17px;font-weight:700;">${this.esc(p.name)}</div><div style="color:var(--muted);font-size:14px;">Player ${i+1}</div></div>
+        <button onclick="app.removePlayer(${p.id})" style="background:none;border:none;color:#4a5a4a;font-size:19px;cursor:pointer;padding:4px;">✕</button>
       </div>`)).join('');
-    const empty=!ps.length?`<div style="text-align:center;padding:22px 0;color:#2A5A35;"><div style="font-size:42px;margin-bottom:8px;">♠</div><div style="font-size:13px;">Add players to begin</div></div>`:'';
+    const empty=!ps.length?`<div style="text-align:center;padding:22px 0;color:#2A5A35;"><div style="font-size:45px;margin-bottom:8px;">♠</div><div style="font-size:16px;">Add players to begin</div></div>`:'';
     return`
       ${this.navBar()}
       <div class="body">
@@ -543,11 +565,20 @@ class SetupRenderer extends BaseRenderer {
         </div>
         <div class="row" style="margin-bottom:12px;">
           <input id="ni" class="inp f1" placeholder="Player name..." value="${this.esc(this.state.newName)}" autocomplete="off">
-          <button onclick="app.addPlayer()" style="padding:9px 15px;border-radius:9px;border:none;background:${this.state.newName.trim()?'#2A5A35':'#1A2A1E'};color:var(--gold);font-size:19px;cursor:pointer;flex-shrink:0;margin-left:8px;">+</button>
+          <button onclick="app.addPlayer()" style="padding:9px 15px;border-radius:9px;border:none;background:${this.state.newName.trim()?'#2A5A35':'#1A2A1E'};color:var(--gold);font-size:22px;cursor:pointer;flex-shrink:0;margin-left:8px;">+</button>
         </div>
         ${empty}${list}
       </div>
-      <div class="foot">${this.pbtn(can?`Start Game → ${ps.length} Players`:'Add at least 2 players',`app.goTo('game')`,{disabled:!can})}</div>`;
+      <div class="foot">
+        <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px;background:var(--bg2);border:1px solid var(--brd);border-radius:11px;padding:9px 12px;">
+          <div style="font-size:15px;color:var(--muted);flex:1;">Rupees per chip (conversion rate)</div>
+          <input id="chip-rate" type="number" min="0.01" step="0.01" class="inp sm" style="width:72px;text-align:right;"
+            placeholder="1" value="${this.state.chipRate!==1?this.state.chipRate:''}"
+            oninput="app.onChipRateInput(this.value)" onblur="app.onChipRateBlur()">
+          <div style="font-size:15px;color:var(--muted);">₹/chip</div>
+        </div>
+        ${this.pbtn(can?`Start Game → ${ps.length} Players`:'Add at least 2 players',`app.goTo('game')`,{disabled:!can})}
+      </div>`;
   }
 }
 
@@ -563,7 +594,7 @@ class GameRenderer extends BaseRenderer {
   _playerRow(p){
     const isExpanded = this.state.expandedPlayer===p.id;
     const isExiting  = this.state.exitingPlayer===p.id;
-    const pills = p.buys.map(b=>`<span class="pill"><span style="color:${p.color};font-weight:700;">${this.fmt(b.amount)}</span><span class="px" onclick="app.removeBuy(${p.id},${b.id})">✕</span></span>`).join('');
+    const rate=this.state.chipRate; const pills = p.buys.map(b=>`<span class="pill"><span style="color:${p.color};font-weight:700;">${b.amount.toLocaleString()}</span><span style="color:var(--muted);font-size:13px;"> chips</span><span class="px" onclick="app.removeBuy(${p.id},${b.id})">✕</span></span>`).join('');
 
     const exitedBadge = p.exited ? `<span class="exited-badge">exited</span>` : '';
 
@@ -572,7 +603,7 @@ class GameRenderer extends BaseRenderer {
       <div class="prow-main" onclick="app.toggleExpand(${p.id})" style="cursor:pointer;">
         <div class="prow-top">
           <div class="prow-name">${this.esc(p.name)}${exitedBadge}</div>
-          <div class="prow-stats">${p.buyCount>0?`${p.buyCount}× · <span style="color:${p.color};font-weight:700;">${this.fmt(p.totalBought)}</span>`:'<span style="color:var(--brd2);">no buys</span>'}</div>
+          <div class="prow-stats">${p.buyCount>0?`${p.buyCount}× · <span style="color:${p.color};font-weight:700;">${p.totalBought.toLocaleString()} chips</span>`:'<span style="color:var(--brd2);">no buys</span>'}</div>
         </div>
       </div>`;
 
@@ -593,7 +624,7 @@ class GameRenderer extends BaseRenderer {
     } else if(isExpanded && p.exited){
       detail=`<div class="prow-detail">
         ${pills?`<div class="strip">${pills}</div>`:''}
-        <div style="font-size:12px;color:#6a3a3a;padding:4px 0;">Exited with ${this.fmt(p.exitChips)}</div>
+        <div style="font-size:15px;color:#6a3a3a;padding:4px 0;">Exited with ${p.exitChips.toLocaleString()} chips</div>
       </div>`;
     }
 
@@ -608,7 +639,7 @@ class GameRenderer extends BaseRenderer {
     return`<div class="exit-panel">
       <div class="exit-label">Player exiting — enter remaining chips to settle</div>
       <div class="exit-row">
-        <input id="exit${p.id}" type="number" class="inp sm f1" placeholder="Chips remaining (₹)">
+        <input id="exit${p.id}" type="number" class="inp sm f1" placeholder="Chips remaining">
         <button class="sbtn green" onclick="app.confirmExit(${p.id})">Settle & Exit</button>
         <button class="sbtn red" onclick="app.cancelExit()">✕</button>
       </div>
@@ -623,10 +654,10 @@ class ExpensesRenderer extends BaseRenderer {
     return`
       ${this.navBar()}
       <div class="body">
-        <div style="color:var(--muted);font-size:11px;margin-bottom:10px;">Each expense splits equally among all players. Toggle any player to opt out.</div>
+        <div style="color:var(--muted);font-size:14px;margin-bottom:10px;">Each expense splits equally among all players. Toggle any player to opt out.</div>
         ${blocks}
         <button class="add-expense-btn" onclick="app.addExpense()">
-          <span style="font-size:18px;line-height:1;">+</span> Add Expense
+          <span style="font-size:21px;line-height:1;">+</span> Add Expense
         </button>
       </div>
       <div class="foot">${this.pbtn('See Final Summary →',"app.goTo('summary')")}</div>`;
@@ -660,16 +691,16 @@ class ExpensesRenderer extends BaseRenderer {
             <input type="number" class="inp sm" style="width:90px;flex-shrink:0;" placeholder="Amount ₹" value="${e.amount||''}"
               oninput="app.state.updateExpense(${e.id},'amount',this.value)" onblur="app.onExpenseBlur(${e.id})">
             <div style="display:flex;align-items:center;gap:4px;flex:1;">
-              <span style="color:var(--muted);font-size:11px;white-space:nowrap;">÷</span>
+              <span style="color:var(--muted);font-size:14px;white-space:nowrap;">÷</span>
               <input type="number" class="inp sm" style="width:52px;flex-shrink:0;" placeholder="ppl" min="1"
                 value="${usingManual?e.splitCount:''}"
                 oninput="app.state.updateExpense(${e.id},'splitCount',this.value)"
                 onblur="app.onExpenseBlur(${e.id})"
                 title="Number of people splitting. Leave blank to use player list below.">
-              ${e.amount>0?`<span style="color:var(--muted);font-size:11px;white-space:nowrap;">= ${this.fmt(share)}/ea</span>`:''}
+              ${e.amount>0?`<span style="color:var(--muted);font-size:14px;white-space:nowrap;">= ${this.fmt(share)}/ea</span>`:''}
             </div>
           </div>
-          ${usingManual?`<div style="font-size:10px;color:#5a7a5a;margin-top:4px;">÷${e.splitCount} people — toggle players below to opt out</div>`:'<div style="font-size:10px;color:#3a5a3a;margin-top:4px;">Leave blank to split by opt-out list below</div>'}
+          ${usingManual?`<div style="font-size:13px;color:#5a7a5a;margin-top:4px;">÷${e.splitCount} people — toggle players below to opt out</div>`:'<div style="font-size:13px;color:#3a5a3a;margin-top:4px;">Leave blank to split by opt-out list below</div>'}
         </div>
         ${canDelete?`<button class="expense-del" onclick="app.removeExpense(${e.id})" title="Remove">✕</button>`:''}
       </div>
@@ -687,20 +718,20 @@ class SummaryRenderer extends BaseRenderer {
     const inputs=activePlayers.map(p=>this.card(`
       <div class="row" style="margin-bottom:6px;">
         <div style="width:8px;height:8px;border-radius:50%;background:${p.color};flex-shrink:0;"></div>
-        <div class="f1"><div style="color:var(--text);font-size:13px;font-weight:700;">${this.esc(p.name)}</div></div>
-        <div style="color:var(--muted);font-size:11px;">Bought ${this.fmt(p.totalBought)}</div>
+        <div class="f1"><div style="color:var(--text);font-size:16px;font-weight:700;">${this.esc(p.name)}</div></div>
+        <div style="color:var(--muted);font-size:14px;">Bought ${p.totalBought.toLocaleString()} chips</div>
       </div>
-      <input id="cp${p.id}" type="number" class="inp sm" placeholder="Chips remaining (₹)" value="${this.esc(this.state.chipDraft[p.id]||'')}">`)).join('');
+      <input id="cp${p.id}" type="number" class="inp sm" placeholder="Chips remaining" value="${this.esc(this.state.chipDraft[p.id]||'')}"><div style="font-size:13px;color:var(--muted);margin-top:3px;">= ${this.state.chipDraft[p.id]?this.fmt(Math.round((parseInt(this.state.chipDraft[p.id])||0)*this.state.chipRate)):'enter chips above'}</div>`)).join('');
 
     const exitedSection=this.state.players.filter(p=>p.exited).map(p=>
-      this.card(`<div class="row"><div style="width:8px;height:8px;border-radius:50%;background:${p.color};flex-shrink:0;"></div><div class="f1" style="font-size:13px;color:#8a7a7a;">${this.esc(p.name)} <span class="exited-badge">exited</span></div><div style="color:#6a5a5a;font-size:12px;">Left ${this.fmt(p.exitChips)}</div></div>`)
+      this.card(`<div class="row"><div style="width:8px;height:8px;border-radius:50%;background:${p.color};flex-shrink:0;"></div><div class="f1" style="font-size:16px;color:#8a7a7a;">${this.esc(p.name)} <span class="exited-badge">exited</span></div><div style="color:#6a5a5a;font-size:15px;">${p.exitChips.toLocaleString()} chips = ${this.fmt(Math.round(p.exitChips*this.state.chipRate))}</div></div>`)
     ).join('');
 
     return`
       ${this.navBar()}
       <div class="body">
         <div class="stat-grid">
-          <div class="stat-card">${this.tag('In Play')}<div class="stat-val">${this.fmt(this.state.totalInPlay)}</div></div>
+          <div class="stat-card">${this.tag('In Play')}<div class="stat-val" style="font-size:19px;">${this.state.totalInPlay.toLocaleString()}<span style="font-size:14px;color:var(--muted);font-weight:400;"> chips</span></div></div>
           <div class="stat-card">${this.tag('Players')}<div class="stat-val">${this.state.players.length}</div></div>
         </div>
         ${this._expenseSummary()}
@@ -721,20 +752,20 @@ class SummaryRenderer extends BaseRenderer {
     const total=nonZero.reduce((s,e)=>s+e.amount,0);
     return`<div style="background:var(--bg3);border:1px solid var(--brd);border-radius:10px;padding:9px 12px;margin-bottom:10px;">
       <div class="tag">Expenses</div>
-      ${nonZero.map(e=>`<div style="display:flex;justify-content:space-between;font-size:12px;color:var(--muted);padding:2px 0;"><span>${this.esc(e.name)||'Expense'}</span><span style="color:var(--text);">${this.fmt(e.amount)}</span></div>`).join('')}
-      <div style="display:flex;justify-content:space-between;font-size:12px;padding-top:6px;margin-top:4px;border-top:1px solid var(--brd);"><span style="color:var(--muted);">Total</span><span style="color:var(--gold);font-weight:700;">${this.fmt(total)}</span></div>
+      ${nonZero.map(e=>`<div style="display:flex;justify-content:space-between;font-size:15px;color:var(--muted);padding:2px 0;"><span>${this.esc(e.name)||'Expense'}</span><span style="color:var(--text);">${this.fmt(e.amount)}</span></div>`).join('')}
+      <div style="display:flex;justify-content:space-between;font-size:15px;padding-top:6px;margin-top:4px;border-top:1px solid var(--brd);"><span style="color:var(--muted);">Total</span><span style="color:var(--gold);font-weight:700;">${this.fmt(total)}</span></div>
     </div>`;
   }
 
   _balanceBar(b){
     if(b.status==='empty')return'';
     const cfgs={
-      partial:{cls:'partial',icon:'…',tc:'#E9A23B',sc:'#7A6A2A',title:`So far: ${this.fmt(this.state.totalChipsEntered)}`,sub:`Need ${this.fmt(this.state.totalInPlay)} · ${this.state.filledChipCount}/${this.state.activePlayers.length} filled`},
-      balanced:{cls:'ok',icon:'✓',tc:'#6FD46F',sc:'#4A7A55',title:'Chips balance perfectly',sub:`${this.fmt(this.state.totalChipsEntered)} remaining = ${this.fmt(this.state.totalInPlay)} in play`},
-      mismatch:{cls:'bad',icon:'⚠',tc:'#E05C5C',sc:'#9A4A4A',title:`Chip mismatch: ${b.diff>0?'+':''}${this.fmt(b.diff)}`,sub:`${this.fmt(this.state.totalChipsEntered)} remaining vs ${this.fmt(this.state.totalInPlay)} in play`},
+      partial:{cls:'partial',icon:'…',tc:'#E9A23B',sc:'#7A6A2A',title:`So far: ${this.state.totalChipsEntered.toLocaleString()} chips`,sub:`Need ${this.state.totalInPlay.toLocaleString()} chips · ${this.state.filledChipCount}/${this.state.activePlayers.length} filled`},
+      balanced:{cls:'ok',icon:'✓',tc:'#6FD46F',sc:'#4A7A55',title:'Chips balance perfectly',sub:`${this.state.totalChipsEntered.toLocaleString()} remaining = ${this.state.totalInPlay.toLocaleString()} in play`},
+      mismatch:{cls:'bad',icon:'⚠',tc:'#E05C5C',sc:'#9A4A4A',title:`Chip mismatch: ${b.diff>0?'+':''}${Math.abs(b.diff).toLocaleString()} chips`,sub:`${this.state.totalChipsEntered.toLocaleString()} remaining vs ${this.state.totalInPlay.toLocaleString()} in play`},
     };
     const c=cfgs[b.status];
-    return`<div class="balbar ${c.cls}" id="balbar"><div style="font-size:18px;">${c.icon}</div><div><div style="color:${c.tc};font-size:12px;font-weight:700;">${c.title}</div><div style="color:${c.sc};font-size:11px;">${c.sub}</div></div></div>`;
+    return`<div class="balbar ${c.cls}" id="balbar"><div style="font-size:21px;">${c.icon}</div><div><div style="color:${c.tc};font-size:15px;font-weight:700;">${c.title}</div><div style="color:${c.sc};font-size:14px;">${c.sub}</div></div></div>`;
   }
 
   _payoutSection(results){
@@ -743,23 +774,40 @@ class SummaryRenderer extends BaseRenderer {
       <div class="row">
         <div style="width:8px;height:8px;border-radius:50%;background:${r.color};flex-shrink:0;"></div>
         <div class="f1" style="padding-left:4px;">
-          <div style="color:var(--text);font-size:13px;font-weight:700;">${this.esc(r.name)}${r.exited?`<span class="exited-badge">exited</span>`:''}</div>
-          <div style="color:var(--muted);font-size:10px;">Bought ${this.fmt(r.bought)} · Left ${this.fmt(r.chipsRemaining)}${r.expenseShare>0?` · Exp ${this.fmt(r.expenseShare)}`:''}</div>
+          <div style="color:var(--text);font-size:16px;font-weight:700;">${this.esc(r.name)}${r.exited?`<span class="exited-badge">exited</span>`:''}</div>
+          <div style="color:var(--muted);font-size:13px;">Bought ${r.bought.toLocaleString()} chips · Left ${r.chipsRemaining.toLocaleString()} chips${r.expenseShare>0?` · Exp ${this.fmt(r.expenseShare)}`:''}</div>
         </div>
         <div style="text-align:right;">
-          <div style="color:${r.netColor};font-size:18px;font-weight:700;">${r.netFormatted}</div>
-          <div style="font-size:10px;color:${r.labelColor};">${r.label}</div>
+          <div style="color:${r.netColor};font-size:21px;font-weight:700;">${r.netFormatted}</div>
+          <div style="font-size:13px;color:${r.labelColor};">${r.label}</div>
         </div>
       </div>`,`border-color:${r.borderColor}`)).join('');
-    const tCards=T.length?T.map(t=>this.card(`
-      <div class="row">
-        <div style="width:8px;height:8px;border-radius:50%;background:${t.fromColor};flex-shrink:0;"></div>
-        <div style="color:var(--amber);font-size:14px;font-weight:700;padding:0 6px;">→</div>
-        <div style="width:8px;height:8px;border-radius:50%;background:${t.toColor};flex-shrink:0;"></div>
-        <div class="f1" style="padding-left:6px;font-size:12px;color:var(--text);"><span style="color:${t.fromColor};">${this.esc(t.from)}</span> pays <span style="color:${t.toColor};">${this.esc(t.to)}</span></div>
-        <div style="color:var(--gold);font-size:16px;font-weight:700;">${this.fmt(t.amount)}</div>
-      </div>`,'border-color:#2A4A35')).join(''):this.card(`<div style="text-align:center;color:#4A9A5A;font-size:13px;padding:5px 0;">All settled — no transfers needed!</div>`);
-    return`<div class="tag" style="margin-top:12px;">Results</div>${rCards}<div class="tag" style="margin-top:12px;">Who Pays Whom</div>${tCards}`;
+
+    const tCards=T.length?T.map(t=>{
+      const key=`${t.from}→${t.to}`;
+      const paid=!!(this.state.paidTransfers&&this.state.paidTransfers[key]);
+      return`<div class="transfer-card ${paid?'paid-card':''}">
+        <div class="row" style="padding:10px 12px;">
+          <div style="width:8px;height:8px;border-radius:50%;background:${t.fromColor};flex-shrink:0;"></div>
+          <div style="color:var(--amber);font-size:17px;font-weight:700;padding:0 6px;">→</div>
+          <div style="width:8px;height:8px;border-radius:50%;background:${t.toColor};flex-shrink:0;"></div>
+          <div class="f1" style="padding-left:6px;font-size:15px;color:var(--text);">
+            <span style="color:${t.fromColor};">${this.esc(t.from)}</span> pays <span style="color:${t.toColor};">${this.esc(t.to)}</span>
+          </div>
+          <div style="color:${paid?'var(--muted)':'var(--gold)'};font-size:19px;font-weight:700;${paid?'text-decoration:line-through;':''}">${this.fmt(t.amount)}</div>
+        </div>
+        <div class="paid-toggle" onclick="app.togglePaid('${key}')">
+          <div class="paid-check${paid?' done':''}${paid?' ✓':''}">${paid?'✓':''}</div>
+          <span class="paid-label${paid?' done':''}">${paid?'Paid ✓':'Mark as paid'}</span>
+        </div>
+      </div>`;
+    }).join('')
+    :this.card(`<div style="text-align:center;color:var(--green2);font-size:16px;padding:5px 0;">All settled — no transfers needed!</div>`);
+
+    const allPaid=T.length>0&&T.every(t=>this.state.paidTransfers&&this.state.paidTransfers[`${t.from}→${t.to}`]);
+    const banner=allPaid?`<div style="text-align:center;background:var(--bg2);border:1px solid var(--brd2);border-radius:10px;padding:10px;margin-top:8px;color:var(--green2);font-size:15px;font-weight:700;">🎉 All payments settled!</div>`:'';
+
+    return`<div class="tag" style="margin-top:12px;">Results</div>${rCards}<div class="tag" style="margin-top:12px;">Who Pays Whom</div>${tCards}${banner}`;
   }
 }
 
@@ -783,6 +831,8 @@ class EventBinder {
     ni.onkeydown=e=>{if(e.key==='Enter')this.app.addPlayer();};
     const rc=document.getElementById('resume-code');
     if(rc)rc.onkeydown=e=>{if(e.key==='Enter')this.app.resumeByCode();};
+    const cr=document.getElementById('chip-rate');
+    if(cr){cr.oninput=e=>{this.app.state.chipRate=parseFloat(e.target.value)||1;};cr.onblur=()=>{this.app.scheduleSync();this.app.render();}; }
   }
   _game(){
     this.app.state.players.forEach(p=>{
@@ -941,6 +991,14 @@ class PokerApp {
     }else{pill.style.display='none';if(noCode)noCode.style.display='block';}
   }
 
+  onChipRateInput(v){this.state.chipRate=parseFloat(v)||1;}
+  togglePaid(key){
+    if(!this.state.paidTransfers) this.state.paidTransfers={};
+    this.state.paidTransfers[key]=!this.state.paidTransfers[key];
+    this.scheduleSync();this.render();
+    setTimeout(()=>{const b=this._root.querySelector('.body');if(b)b.scrollTop=b.scrollHeight;},50);
+  }
+  onChipRateBlur(){this.scheduleSync();this.render();}
   confirmNewGame(){document.getElementById('modal').style.display='flex';}
   hideModal(){document.getElementById('modal').style.display='none';}
   resetGame(){
