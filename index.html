@@ -197,9 +197,9 @@ const MIN_PLAYERS   = 2;
 const LOCAL_KEY     = 'poker_azure_v2';
 
 const AZURE_CONFIG = {
-  account:   'pokertracker2024',  // e.g.  pokertracker2024
-  container: 'poker-games',                // blob container name
-  sasToken:  'sv=2024-11-04&ss=b&srt=co&sp=rwciytfx&se=2028-03-31T17:27:57Z&st=2026-03-31T09:12:57Z&spr=https&sig=yHR52plmUZaPofc%2Bu%2F1n4o1b%2BKOCUGvQGZbew5fgY00%3D',             // starts with sv=...
+  account:   'YOUR_STORAGE_ACCOUNT_NAME',
+  container: 'poker-games',
+  sasToken:  'YOUR_SAS_TOKEN',
 };
 
 // ══ CloudStore ════════════════════════════════════════════════════════════
@@ -341,6 +341,23 @@ class Expense {
   toJSON(){return{id:this.id,name:this.name,amount:this.amount,optOut:this.optOut,splitCount:this.splitCount,paidBy:this.paidBy};}
 }
 
+class ExitPayment {
+  // Records a cash payment made by an exiting player to another player
+  constructor(id, fromId, fromName, toId, toName, amount, time) {
+    this.id = id;
+    this.fromId = fromId; this.fromName = fromName;
+    this.toId = toId;     this.toName = toName;
+    this.amount = amount;
+    this.time = time || new Date().toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'});
+  }
+  static fromJSON(d) {
+    return new ExitPayment(d.id, d.fromId, d.fromName, d.toId, d.toName, d.amount, d.time);
+  }
+  toJSON() {
+    return {id:this.id,fromId:this.fromId,fromName:this.fromName,toId:this.toId,toName:this.toName,amount:this.amount,time:this.time};
+  }
+}
+
 class PlayerResult {
   constructor({id,name,color,bought,chipsRemaining,expenseShare,exited,rate}){
     this.id=id;this.name=name;this.color=color;
@@ -379,10 +396,11 @@ class GameState {
     this.chipDraft={};
     this.showPayout=false;
     this.chipRate=0.5;
+    this.exitPayments=[];    // ExitPayment[] — cash settled at exit time
     this.paidTransfers={};  // key: "from→to", value: true/false            // rupees per 1 chip
     this.expandedPlayer=null;
     this.exitingPlayer=null;
-    this.showResumeInput=false;
+    this.editingExitPlayer=null;  // player whose exit is being corrected
   }
   reset(){this._nid=1;this._init();}
   nextId(){return this._nid++;}
@@ -424,12 +442,26 @@ class GameState {
   }
   removeBuy(pid,bid){const p=this.getPlayer(pid);if(p)p.removeBuy(bid);}
 
-  exitPlayer(pid,chips){
-    const p=this.getPlayer(pid);if(!p)return;
-    p.exited=true;p.exitChips=chips;
+  undoExit(pid){
+    const p=this.getPlayer(pid); if(!p) return;
+    p.exited=false; p.exitChips=0;
+    delete this.chipDraft[pid];
+    // Remove any exit payments made by this player
+    this.exitPayments=this.exitPayments.filter(ep=>ep.fromId!==pid);
+    this.editingExitPlayer=null;
+  }
+  exitPlayer(pid, chips, payToId, payAmount){
+    const p=this.getPlayer(pid); if(!p)return;
+    p.exited=true; p.exitChips=chips;
     this.exitingPlayer=null;
-    // pre-fill chipDraft for summary
     this.chipDraft[pid]=String(chips);
+    // Record cash settlement made at exit time
+    if(payToId && payAmount>0){
+      const to=this.getPlayer(payToId);
+      if(to) this.exitPayments.push(
+        new ExitPayment(this.nextId(), pid, p.name, payToId, to.name, payAmount)
+      );
+    }
   }
 
   addExpense(){
@@ -457,7 +489,7 @@ class GameState {
       _nid:this._nid,screen:this.screen,
       players:this.players.map(p=>p.toJSON()),
       expenses:this.expenses.map(e=>e.toJSON()),
-      buyDraft:this.buyDraft,chipDraft:this.chipDraft,showPayout:this.showPayout,chipRate:this.chipRate,paidTransfers:this.paidTransfers,
+      buyDraft:this.buyDraft,chipDraft:this.chipDraft,showPayout:this.showPayout,chipRate:this.chipRate,paidTransfers:this.paidTransfers,exitPayments:this.exitPayments.map(e=>e.toJSON()),
     };
   }
   fromJSON(d){
@@ -465,7 +497,7 @@ class GameState {
     this.players=(d.players||[]).map(Player.fromJSON);
     this.expenses=(d.expenses||[{id:1,name:'Room Rent',amount:0,optOut:[]}]).map(Expense.fromJSON);
     this.buyDraft=d.buyDraft||{};this.chipDraft=d.chipDraft||{};
-    this.showPayout=d.showPayout||false;this.chipRate=d.chipRate||0.5;this.paidTransfers=d.paidTransfers||{};
+    this.showPayout=d.showPayout||false;this.chipRate=d.chipRate||0.5;this.paidTransfers=d.paidTransfers||{};this.exitPayments=(d.exitPayments||[]).map(ExitPayment.fromJSON);
   }
   saveLocal(gameCode){try{localStorage.setItem(LOCAL_KEY,JSON.stringify({gameCode,data:this.toJSON()}));}catch(e){}}
   static loadLocal(){try{const r=localStorage.getItem(LOCAL_KEY);return r?JSON.parse(r):null;}catch(e){return null;}}
@@ -482,15 +514,30 @@ class GameEngine {
       exited:p.exited,rate:state.chipRate,
     }));
   }
-  static computeTransfers(results){
-    const d=results.filter(r=>r.isLoser).map(r=>({r,owe:-r.netRupees})).sort((a,b)=>b.owe-a.owe);
-    const c=results.filter(r=>r.isWinner).map(r=>({r,owed:r.netRupees})).sort((a,b)=>b.owed-a.owed);
+  static computeTransfers(results, exitPayments=[]){
+    // Build a net balance map (₹) for every player, keyed by name
+    const bal = {};
+    results.forEach(r => { bal[r.name] = r.netRupees; });
+
+    // Apply exit payments: payer's debt reduces, receiver's credit reduces
+    // (they already got cash — no further transfer needed between them)
+    exitPayments.forEach(ep => {
+      if(bal[ep.fromName] !== undefined) bal[ep.fromName] += ep.amount;  // debt reduced
+      if(bal[ep.toName]   !== undefined) bal[ep.toName]   -= ep.amount;  // credit reduced
+    });
+
+    // Now minimise transfers with the greedy largest-first algorithm
+    const resultMap = Object.fromEntries(results.map(r => [r.name, r]));
+    const debtors   = Object.entries(bal).filter(([,v])=>v< -0.5).map(([n,v])=>({name:n,owe:-v,r:resultMap[n]})).sort((a,b)=>b.owe-a.owe);
+    const creditors = Object.entries(bal).filter(([,v])=>v>  0.5).map(([n,v])=>({name:n,owed:v,r:resultMap[n]})).sort((a,b)=>b.owed-a.owed);
+
     const T=[];
-    while(d.length&&c.length){
-      const amt=Math.min(d[0].owe,c[0].owed);
-      if(amt>=1)T.push(new Transfer(d[0].r,c[0].r,amt));
-      d[0].owe-=amt;c[0].owed-=amt;
-      if(d[0].owe<1)d.shift();if(c[0].owed<1)c.shift();
+    while(debtors.length && creditors.length){
+      const amt=Math.min(debtors[0].owe, creditors[0].owed);
+      if(amt>=1) T.push(new Transfer(debtors[0].r, creditors[0].r, amt));
+      debtors[0].owe  -= amt; creditors[0].owed -= amt;
+      if(debtors[0].owe  < 0.5) debtors.shift();
+      if(creditors[0].owed < 0.5) creditors.shift();
     }
     return T;
   }
@@ -540,24 +587,18 @@ class BaseRenderer {
     const syncEl=`<div style="display:flex;align-items:center;gap:5px;">
       <div class="dot ok" id="sync-dot"></div>
       <span id="no-code-label" style="color:var(--muted);font-size:12px;display:none;"></span>
-      <span id="code-pill-wrap" style="display:none;"><span class="code-pill" onclick="app.copyCode()"><span style="color:var(--muted);font-size:11px;">Code</span><span class="code-val" id="code-display"></span><span style="color:var(--muted);font-size:11px;">&#x2398;</span></span></span>
+      <span id="code-pill-wrap" style="display:none;"><span class="code-pill" onclick="app.copyCode()"><span style="color:var(--muted);font-size:11px;">Code</span><span class="code-val" id="code-display"></span><span style="color:var(--muted);font-size:11px;">⎘</span></span></span>
     </div>`;
-    const isSetup=this.state.screen===SCREENS.SETUP;
-    const resumeOpen=isSetup&&this.state.showResumeInput;
-    // Resume button always sits left of dots in the steps bar (setup screen only)
-    const leftSlot=isSetup
-      ? `<button class="newbtn" onclick="app.toggleResumeInput()" style="color:var(--gold);font-size:12px;padding:4px 9px;">${resumeOpen?'&#x2715; Close':'&#x2601; Resume'}</button>`
-      : (prevLabel?`<button class="bbtn" onclick="app.goTo('${SCREEN_ORDER[i-1]}')">&#x2039; ${prevLabel}</button>`:'');
     return`
       <div class="tnav">
-        <button class="newbtn" onclick="app.confirmNewGame()">New &#x21BA;</button>
+        <button class="newbtn" onclick="app.confirmNewGame()">New ↺</button>
         <div style="font-size:18px;font-weight:700;color:var(--gold);letter-spacing:.3px;">${SCREEN_LABELS[this.state.screen]}</div>
         ${syncEl}
       </div>
       <div class="steps">
-        <span class="step-side step-prev">${leftSlot}</span>
+        <span class="step-side step-prev">${prevLabel?`<button class="bbtn" onclick="app.goTo('${SCREEN_ORDER[i-1]}')">‹ ${prevLabel}</button>`:''}</span>
         <div style="display:flex;align-items:center;gap:0;flex:1;justify-content:center;">${dots}</div>
-        <span class="step-side step-next">${nextLabel?`<span style="color:var(--muted);font-size:13px;white-space:nowrap;">${nextLabel} &#x203A;</span>`:''}</span>
+        <span class="step-side step-next">${nextLabel?`<span style="color:var(--muted);font-size:13px;white-space:nowrap;">${nextLabel} ›</span>`:''}</span>
       </div>`;
   }
 }
@@ -573,18 +614,16 @@ class SetupRenderer extends BaseRenderer {
         <button onclick="app.removePlayer(${p.id})" style="background:none;border:none;color:#4a5a4a;font-size:18px;cursor:pointer;padding:4px;">✕</button>
       </div>`)).join('');
     const empty=!ps.length?`<div style="text-align:center;padding:22px 0;color:#2A5A35;"><div style="font-size:44px;margin-bottom:8px;">♠</div><div style="font-size:15px;">Add players to begin</div></div>`:'';
-    const resumeOpen=this.state.showResumeInput;
-    const resumePanel=resumeOpen?`<div style="background:var(--bg2);border:1px solid var(--brd2);border-radius:11px;padding:10px 12px;margin-bottom:10px;">
-      <div style="font-size:12px;color:var(--muted);letter-spacing:.5px;text-transform:uppercase;margin-bottom:7px;">&#x2601; Resume game from another device</div>
-      <div style="display:flex;gap:6px;">
-        <input class="resume-inp" id="resume-code" placeholder="Enter game code&hellip;" autocomplete="off" maxlength="25" style="flex:1;min-width:0;">
-        <button class="sbtn green" onclick="app.resumeByCode()" style="padding:8px 13px;">Load &rarr;</button>
-      </div>
-    </div>`:'';
     return`
       ${this.navBar()}
       <div class="body">
-        ${resumePanel}
+        <div class="resume-card">
+          <div class="resume-title">☁ Resume a game from another device</div>
+          <div class="resume-row">
+            <input class="resume-inp" id="resume-code" placeholder="Enter game code..." autocomplete="off" maxlength="25">
+            <button class="sbtn green" onclick="app.resumeByCode()" style="padding:8px 13px;">Load →</button>
+          </div>
+        </div>
         <div class="row" style="margin-bottom:12px;">
           <input id="ni" class="inp f1" placeholder="Player name..." value="${this.esc(this.state.newName)}" autocomplete="off">
           <button onclick="app.addPlayer()" style="padding:9px 15px;border-radius:9px;border:none;background:${this.state.newName.trim()?'#2A5A35':'#1A2A1E'};color:var(--gold);font-size:21px;cursor:pointer;flex-shrink:0;margin-left:8px;">+</button>
@@ -595,7 +634,7 @@ class SetupRenderer extends BaseRenderer {
         <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px;background:var(--bg2);border:1px solid var(--brd);border-radius:11px;padding:9px 12px;">
           <div style="font-size:14px;color:var(--muted);flex:1;">Rupees per chip (conversion rate)</div>
           <input id="chip-rate" type="number" min="0.01" step="0.01" class="inp sm" style="width:72px;text-align:right;"
-            placeholder="0.5" value="${this.state.chipRate}"
+            placeholder="0.5" value="${this.state.chipRate||''}"
             oninput="app.onChipRateInput(this.value)" onblur="app.onChipRateBlur()">
           <div style="font-size:14px;color:var(--muted);">₹/chip</div>
         </div>
@@ -644,9 +683,18 @@ class GameRenderer extends BaseRenderer {
         ${isExiting?this._exitPanel(p):''}
       </div>`;
     } else if(isExpanded && p.exited){
+      const isEditingExit=this.state.editingExitPlayer===p.id;
+      // Find existing exit payment for this player
+      const existingEp=(this.state.exitPayments||[]).find(ep=>ep.fromId===p.id);
       detail=`<div class="prow-detail">
         ${pills?`<div class="strip">${pills}</div>`:''}
-        <div style="font-size:14px;color:#6a3a3a;padding:4px 0;">Exited with ${p.exitChips.toLocaleString()} chips</div>
+        ${isEditingExit
+          ? this._editExitPanel(p, existingEp)
+          : `<div style="display:flex;align-items:center;gap:8px;padding:2px 0;">
+              <span style="font-size:13px;color:var(--muted);">Exited with <span style="color:var(--text);font-weight:700;">${p.exitChips.toLocaleString()} chips</span>${existingEp?` · paid ₹${existingEp.amount.toLocaleString()} to ${this.esc(existingEp.toName)}`:''}</span>
+              <button class="sbtn green" onclick="event.stopPropagation();app.startEditExit(${p.id})" style="padding:4px 10px;font-size:12px;margin-left:auto;">Edit</button>
+            </div>`
+        }
       </div>`;
     }
 
@@ -657,14 +705,63 @@ class GameRenderer extends BaseRenderer {
     </div>${detail?`<div style="background:var(--bg2);border:1px solid var(--brd);border-top:none;border-radius:0 0 10px 10px;margin-top:-8px;margin-bottom:8px;">${detail}</div>`:''}`;
   }
 
-  _exitPanel(p){
-    return`<div class="exit-panel">
-      <div class="exit-label">Player exiting — enter remaining chips to settle</div>
+  _editExitPanel(p, existingEp){
+    // Pre-fill with current values for correction
+    const others=this.state.players.filter(q=>q.id!==p.id);
+    const otherOpts=['<option value="">— No cash payment —</option>']
+      .concat(others.map(q=>`<option value="${q.id}" ${existingEp&&existingEp.toId===q.id?'selected':''}>${this.esc(q.name)}</option>`))
+      .join('');
+    const existingAmt=existingEp?existingEp.amount:'';
+
+    return`<div class="exit-panel" style="border-color:var(--amber);">
+      <div class="exit-label" style="color:var(--amber);">Editing exit — correct details below</div>
       <div class="exit-row">
-        <input id="exit${p.id}" type="number" class="inp sm f1" placeholder="Chips remaining">
-        <button class="sbtn green" onclick="app.confirmExit(${p.id})">Settle & Exit</button>
+        <input id="exitedit${p.id}" type="number" class="inp sm f1" placeholder="Chips remaining"
+          value="${p.exitChips||''}">
+        <button class="sbtn green" onclick="app.confirmEditExit(${p.id})">Save</button>
+        <button class="sbtn red" onclick="app.cancelEditExit()">✕</button>
+      </div>
+      <div style="font-size:12px;color:var(--muted);margin-top:4px;">
+        Bought ${p.totalBought.toLocaleString()} chips
+      </div>
+      ${others.length?`<div style="margin-top:6px;">
+        <div style="font-size:12px;color:var(--muted);margin-bottom:4px;">Cash paid to (optional):</div>
+        <div style="display:flex;gap:6px;">
+          <select id="exitEditPayTo${p.id}" class="inp sm f1" style="color:var(--text);">${otherOpts}</select>
+          <input id="exitEditPayAmt${p.id}" type="number" class="inp sm" style="width:80px;" placeholder="₹" value="${existingAmt}">
+        </div>
+      </div>`:''}
+    </div>`;
+  }
+
+  _exitPanel(p){
+    const others=this.state.players.filter(q=>q.id!==p.id&&!q.exited);
+    const otherOpts=['<option value="">— No cash payment —</option>']
+      .concat(others.map(q=>`<option value="${q.id}">${this.esc(q.name)}</option>`))
+      .join('');
+
+    // Estimate net based on chips entered so far (live feedback)
+    const bought=p.totalBought;
+    const netNote=`<div style="font-size:12px;margin-top:4px;color:var(--muted);">
+      Bought ${bought.toLocaleString()} chips — enter chips remaining above, then optionally record cash paid below
+    </div>`;
+
+    return`<div class="exit-panel">
+      <div class="exit-label">Player exiting — enter remaining chips</div>
+      <div class="exit-row">
+        <input id="exit${p.id}" type="number" class="inp sm f1" placeholder="Chips remaining"
+          oninput="app.state.buyDraft['_exit_chips_'+${p.id}]=this.value">
+        <button class="sbtn green" onclick="app.confirmExit(${p.id})">Exit</button>
         <button class="sbtn red" onclick="app.cancelExit()">✕</button>
       </div>
+      ${netNote}
+      ${others.length?`<div style="margin-top:6px;">
+        <div style="font-size:12px;color:var(--muted);margin-bottom:4px;">Paid cash to (optional):</div>
+        <div style="display:flex;gap:6px;">
+          <select id="exitPayTo${p.id}" class="inp sm f1" style="color:var(--text);">${otherOpts}</select>
+          <input id="exitPayAmt${p.id}" type="number" class="inp sm" style="width:80px;" placeholder="₹">
+        </div>
+      </div>`:''}
     </div>`;
   }
 }
@@ -820,7 +917,7 @@ class SummaryRenderer extends BaseRenderer {
   }
 
   _payoutSection(results){
-    const T=GameEngine.computeTransfers(results);
+    const T=GameEngine.computeTransfers(results, this.state.exitPayments||[]);
     const rCards=results.map(r=>this.card(`
       <div class="row">
         <div style="width:8px;height:8px;border-radius:50%;background:${r.color};flex-shrink:0;"></div>
@@ -858,7 +955,19 @@ class SummaryRenderer extends BaseRenderer {
     const allPaid=T.length>0&&T.every(t=>this.state.paidTransfers&&this.state.paidTransfers[`${t.from}→${t.to}`]);
     const banner=allPaid?`<div style="text-align:center;background:var(--bg2);border:1px solid var(--brd2);border-radius:10px;padding:10px;margin-top:8px;color:var(--green2);font-size:14px;font-weight:700;">🎉 All payments settled!</div>`:'';
 
-    return`<div class="tag" style="margin-top:12px;">Results</div>${rCards}<div class="tag" style="margin-top:12px;">Who Pays Whom</div>${tCards}${banner}`;
+    // Show already-settled exit payments for reference
+    const eps=this.state.exitPayments||[];
+    const epSection=eps.length?`
+      <div class="tag" style="margin-top:12px;">Already Settled at Exit</div>
+      ${eps.map(ep=>this.card(`
+        <div class="row">
+          <div style="font-size:13px;color:var(--muted);">${this.esc(ep.fromName)} paid <span style="color:var(--gold);font-weight:700;">${this.fmt(ep.amount)}</span> cash to <span style="color:var(--green2);">${this.esc(ep.toName)}</span></div>
+          <div style="font-size:12px;color:var(--muted);margin-left:auto;flex-shrink:0;">${ep.time}</div>
+        </div>
+      `,'border-color:var(--brd2);opacity:.7')).join('')}
+    `:'';
+
+    return`<div class="tag" style="margin-top:12px;">Results</div>${rCards}<div class="tag" style="margin-top:12px;">Who Pays Whom</div>${tCards}${banner}${epSection}`;
   }
 }
 
@@ -883,7 +992,7 @@ class EventBinder {
     const rc=document.getElementById('resume-code');
     if(rc)rc.onkeydown=e=>{if(e.key==='Enter')this.app.resumeByCode();};
     const cr=document.getElementById('chip-rate');
-    if(cr){cr.oninput=e=>{this.app.state.chipRate=parseFloat(e.target.value)||1;};cr.onblur=()=>{this.app.scheduleSync();this.app.render();}; }
+    if(cr){cr.oninput=e=>{this.app.state.chipRate=parseFloat(e.target.value)||0.5;};cr.onblur=()=>{this.app.scheduleSync();this.app.render();}; }
   }
   _game(){
     this.app.state.players.forEach(p=>{
@@ -902,7 +1011,7 @@ class EventBinder {
         const rp=document.getElementById('rp'+p.id);
         if(rp){
           const chips=parseInt(e.target.value)||0;
-          const rate=this.app.state.chipRate||1;
+          const rate=this.app.state.chipRate||0.5;
           rp.textContent=chips?'= ₹'+(Math.round(chips*rate)).toLocaleString():'enter chips above';
         }
       };inp.onblur=()=>{this.app.scheduleSync();};
@@ -968,13 +1077,49 @@ class PokerApp {
     setTimeout(()=>{const inp=document.getElementById('exit'+pid);if(inp)inp.focus();},50);
   }
   cancelExit(){this.state.exitingPlayer=null;this.render();}
+  startEditExit(pid){
+    this.state.expandedPlayer=pid;
+    this.state.editingExitPlayer=pid;
+    this.render();
+    setTimeout(()=>{ const i=document.getElementById('exitedit'+pid); if(i){i.focus();i.select();} },50);
+  }
+  cancelEditExit(){
+    this.state.editingExitPlayer=null;
+    this.render();
+  }
+  confirmEditExit(pid){
+    const inp=document.getElementById('exitedit'+pid);
+    const chips=parseInt(inp?inp.value:'0')||0;
+    const payToEl=document.getElementById('exitEditPayTo'+pid);
+    const payAmtEl=document.getElementById('exitEditPayAmt'+pid);
+    const payToId=payToEl&&payToEl.value?parseInt(payToEl.value):null;
+    const payAmt=payAmtEl?parseInt(payAmtEl.value)||0:0;
+    // Undo exit first (restores player as active, removes old payment)
+    this.state.undoExit(pid);
+    // Re-exit with corrected values
+    this.state.exitPlayer(pid, chips, payToId, payAmt);
+    this.state.editingExitPlayer=null;
+    this.scheduleSync();
+    this.render();
+    const name=this.state.getPlayer(pid)?.name||'Player';
+    const payMsg=payToId&&payAmt>0?` · paid ₹${payAmt.toLocaleString()} to ${this.state.getPlayer(payToId)?.name||''}`:'' ;
+    this.toast(`${name} exit updated${payMsg}`);
+  }
   confirmExit(pid){
     const inp=document.getElementById('exit'+pid);
     const chips=parseInt(inp?inp.value:0)||0;
-    this.state.exitPlayer(pid,chips);
+    const payToEl=document.getElementById('exitPayTo'+pid);
+    const payAmtEl=document.getElementById('exitPayAmt'+pid);
+    const payToId=payToEl&&payToEl.value?parseInt(payToEl.value):null;
+    const payAmt=payAmtEl?parseInt(payAmtEl.value)||0:0;
+    // Clean up temp draft key
+    delete this.state.buyDraft['_exit_chips_'+pid];
+    this.state.exitPlayer(pid, chips, payToId, payAmt);
     this.scheduleSync();
     this.render();
-    this.toast(`${this.state.getPlayer(pid)?.name||'Player'} settled & exited`);
+    const name=this.state.getPlayer(pid)?.name||'Player';
+    const payMsg=payToId&&payAmt>0?` · paid ₹${payAmt.toLocaleString()} to ${this.state.getPlayer(payToId)?.name||''}`:'' ;
+    this.toast(`${name} exited${payMsg}`);
   }
 
   // Expenses
@@ -1005,7 +1150,6 @@ class PokerApp {
   }
 
   // Resume
-  toggleResumeInput(){this.state.showResumeInput=!this.state.showResumeInput;this.render();if(this.state.showResumeInput)setTimeout(()=>{const inp=document.getElementById('resume-code');if(inp)inp.focus();},50);}
   async resumeByCode(){
     const inp=document.getElementById('resume-code');
     const code=(inp?inp.value.trim():'');
@@ -1014,7 +1158,7 @@ class PokerApp {
     try{
       const data=await this.cloud.read(code);
       this.state.fromJSON(data);this.cloud.gameCode=code;
-      this.state.saveLocal(code);this.state.showResumeInput=false;this._syncBar('ok');this.render();this.toast('Game resumed ✓');
+      this.state.saveLocal(code);this._syncBar('ok');this.render();this.toast('Game resumed ✓');
     }catch(e){this.toast('Code not found — try again','err');}
   }
 
@@ -1052,7 +1196,7 @@ class PokerApp {
     }else{pill.style.display='none';if(noCode)noCode.style.display='block';}
   }
 
-  onChipRateInput(v){this.state.chipRate=parseFloat(v)||1;}
+  onChipRateInput(v){this.state.chipRate=parseFloat(v)||0.5;}
   togglePaid(key){
     if(!this.state.paidTransfers) this.state.paidTransfers={};
     this.state.paidTransfers[key]=!this.state.paidTransfers[key];
@@ -1063,7 +1207,7 @@ class PokerApp {
   confirmNewGame(){document.getElementById('modal').style.display='flex';}
   hideModal(){document.getElementById('modal').style.display='none';}
   resetGame(){
-    this.state.reset();this.cloud.gameCode=null;this.state.showResumeInput=false;
+    this.state.reset();this.cloud.gameCode=null;
     try{localStorage.removeItem(LOCAL_KEY);}catch(e){}
     this._syncBar('none');this.render();
   }
