@@ -209,10 +209,11 @@ const CURRENCY      = '₹';
 const MIN_PLAYERS   = 2;
 const LOCAL_KEY     = 'poker_azure_v2';
 
+// ── AZURE CONFIG — fill in after following the setup guide ───────────────
 const AZURE_CONFIG = {
-  account:   'YOUR_STORAGE_ACCOUNT_NAME',
-  container: 'poker-games',
-  sasToken:  'YOUR_SAS_TOKEN',
+  account:   'pokertracker2024',  // e.g.  pokertracker2024
+  container: 'poker-games',                // blob container name
+  sasToken:  'sv=2024-11-04&ss=b&srt=co&sp=rwciytfx&se=2028-03-31T17:27:57Z&st=2026-03-31T09:12:57Z&spr=https&sig=yHR52plmUZaPofc%2Bu%2F1n4o1b%2BKOCUGvQGZbew5fgY00%3D',             // starts with sv=...
 };
 
 const esc=s=>(s||'').replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/</g,'&lt;');
