@@ -236,6 +236,9 @@ class CloudStore {
   }
 
   _makeCode(){ return String(Math.floor(1000+Math.random()*9000)); }
+  // The "share code" shown to users = the JSONBlob ID (full, so another device can fetch)
+  // We keep a separate short 4-digit display code for the UI label,
+  // but the actual resume code is the blobId.
 
   _azureUrl(c){
     const{account,container,sasToken}=AZURE_CONFIG;
@@ -286,28 +289,23 @@ class CloudStore {
     return r.json();
   }
 
-  // ── read: used by resumeByCode — tries Azure then JSONBlob then local ──
+  // ── read: used by resumeByCode ────────────────────────────────────────
+  // The "code" shared between devices is the JSONBlob ID (numeric string ~18 digits).
+  // We display a 4-digit short code locally, but share the full blobId for cross-device resume.
   async read(code){
-    // Azure: 4-digit numeric code
-    if(this.isAzureConfigured && /^\d{4}$/.test(code)){
-      try{ return await this._azureGet(code); }catch(e){}
+    const trimmed=code.trim();
+    // Azure (if configured): 4-digit code maps to azure blob
+    if(this.isAzureConfigured && /^\d{4}$/.test(trimmed)){
+      try{ return await this._azureGet(trimmed); }catch(e){}
     }
-    // JSONBlob: long alphanumeric blob ID stored alongside the 4-digit display code
-    // The local cache maps display code → blobId
+    // Direct JSONBlob fetch — trimmed is the blobId
+    try{ return await this._jbGet(trimmed); }catch(e){}
+    // Same-device local cache fallback
     const local=GameState.loadLocal();
-    if(local&&local.gameCode===code){
-      // Try refreshing from JSONBlob if we have the blobId
-      if(local.blobId){
-        try{ return await this._jbGet(local.blobId); }catch(e){}
-      }
-      // Fall back to local cache
+    if(local&&(local.gameCode===trimmed||local.blobId===trimmed)){
       return local.data;
     }
-    // Code entered might itself be a raw JSONBlob ID (long string)
-    if(code.length>8){
-      try{ return await this._jbGet(code); }catch(e){}
-    }
-    throw new Error('Game not found');
+    throw new Error('Game not found — check the code and try again');
   }
 
   // ── schedule: saves to cloud on every meaningful action ───────────────
@@ -340,8 +338,12 @@ class CloudStore {
       // JSONBlob fallback (always available, no config needed)
       try{
         if(this.blobId) await this._jbUpdate(this.blobId,data);
-        else { this.blobId=await this._jbCreate(data); }
-        // Persist blobId to localStorage so resume works
+        else{
+          this.blobId=await this._jbCreate(data);
+          // Use the blobId as the share code — it's what other devices need to resume
+          this.gameCode=this.blobId;
+        }
+        // Persist to localStorage
         try{
           localStorage.setItem(LOCAL_KEY,JSON.stringify({
             gameCode:this.gameCode, blobId:this.blobId, data
@@ -804,7 +806,7 @@ class BaseRenderer {
     const syncEl=`<div style="display:flex;align-items:center;gap:5px;">
       <div class="dot ok" id="sync-dot"></div>
       <span id="no-code-label" style="color:var(--muted);font-size:12px;display:none;"></span>
-      <span id="code-pill-wrap" style="display:none;"><span class="code-pill" onclick="app.copyCode()"><span style="color:var(--muted);font-size:11px;">Code</span><span class="code-val" id="code-display"></span><span style="color:var(--muted);font-size:11px;">⎘</span></span></span>
+      <span id="code-pill-wrap" style="display:none;"><span class="code-pill" onclick="app.copyCode()"><span style="color:var(--muted);font-size:11px;">Code</span><span class="code-val" id="code-display" style="max-width:110px;overflow:hidden;text-overflow:ellipsis;"></span><span style="color:var(--muted);font-size:11px;">⎘</span></span></span>
     </div>`;
     return`
       <div class="tnav">
@@ -837,7 +839,7 @@ class SetupRenderer extends BaseRenderer {
         <div class="resume-card">
           <div class="resume-title">☁ Resume a game from another device</div>
           <div class="resume-row">
-            <input class="resume-inp" id="resume-code" placeholder="Enter game code..." autocomplete="off" maxlength="25">
+            <input class="resume-inp" id="resume-code" placeholder="Paste game code from another device" autocomplete="off" maxlength="25">
             <button class="sbtn green" onclick="app.resumeByCode()" style="padding:8px 13px;">Load →</button>
           </div>
         </div>
@@ -1488,11 +1490,10 @@ class PokerApp {
     try{
       const data=await this.cloud.read(code);
       this.state.fromJSON(data);
+      // The code entered IS the blobId (or azure code) — use it for future saves
       this.cloud.gameCode=code;
-      // Restore blobId if this code matches local cache
-      const local=GameState.loadLocal();
-      if(local&&local.gameCode===code&&local.blobId) this.cloud.blobId=local.blobId;
-      this.state.saveLocal(code,this.cloud.blobId);
+      this.cloud.blobId=code;
+      this.state.saveLocal(code,code);
       this._syncBar('ok');this.render();this.toast('Game resumed ✓');
     }catch(e){
       console.error('Resume error:',e);
