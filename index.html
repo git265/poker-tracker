@@ -1,8 +1,6 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<link rel="manifest" href="manifest.json">
-<meta name="apple-mobile-web-app-capable" content="yes">
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
 <meta name="apple-mobile-web-app-capable" content="yes">
@@ -207,157 +205,93 @@ const SCREEN_ORDER  = ['setup','game','expenses','summary'];
 const COLORS        = ['#E9A23B','#E05C5C','#5CB8E9','#6FD46F','#C97FE8','#F06FA0','#4ECEC4','#F5A623'];
 const CURRENCY      = '₹';
 const MIN_PLAYERS   = 2;
-const LOCAL_KEY     = 'poker_azure_v2';
+const LOCAL_KEY = 'poker_azure_v2';
 
-// ── AZURE CONFIG — fill in after following the setup guide ───────────────
+// ── Azure Blob Storage config ─────────────────────────────────────────────
+// 1. Create a Storage Account in Azure portal
+// 2. Create a container named "poker-games" with Anonymous read access: Blob
+// 3. Generate a SAS token: Storage Account → Shared access signature
+//    Permissions: Read + Write + Create   Expiry: set to a far future date
+//    Allowed resource types: Object
+// 4. Fill in your values below and redeploy the file
 const AZURE_CONFIG = {
-  account:   'pokertracker2024',  // e.g.  pokertracker2024
-  container: 'poker-games',                // blob container name
-  sasToken:  'sv=2024-11-04&ss=b&srt=co&sp=rwciytfx&se=2028-03-31T17:27:57Z&st=2026-03-31T09:12:57Z&spr=https&sig=yHR52plmUZaPofc%2Bu%2F1n4o1b%2BKOCUGvQGZbew5fgY00%3D',             // starts with sv=...
+  account:   'pokertracker2024',   // e.g. 'pokertrackerstorage'
+  container: 'poker-games',
+  sasToken:  'sv=2024-11-04&ss=b&srt=co&sp=rwciytfx&se=2028-03-31T17:27:57Z&st=2026-03-31T09:12:57Z&spr=https&sig=yHR52plmUZaPofc%2Bu%2F1n4o1b%2BKOCUGvQGZbew5fgY00%3D',              // starts with 'sv=...'
 };
 
 const esc=s=>(s||'').replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/</g,'&lt;');
 
-// ══ CloudStore ════════════════════════════════════════════════════════════
-// Priority: Azure Blob (if configured) → JSONBlob (free, zero-config) → localStorage
-// JSONBlob is the default so "resume from another device" works immediately
-// without any Azure setup. Set up Azure config above for your own storage.
-const JSONBLOB_API = 'https://jsonblob.com/api/jsonBlob';
-
+// ══ CloudStore — Azure Blob only, localStorage as offline cache ═══════════
 class CloudStore {
   constructor(){
-    this.gameCode=null;   // 4-digit code (Azure) or long JSONBlob ID
-    this.blobId=null;     // JSONBlob blob ID (different from gameCode display)
+    this.gameCode=null;  // 4-digit code — filename in Azure: game-XXXX.json
     this._t=null;
-    this._mode='unknown'; // 'azure' | 'jsonblob' | 'local'
   }
 
-  get isAzureConfigured(){
+  get isConfigured(){
     const{account,sasToken}=AZURE_CONFIG;
-    return account!=='YOUR_STORAGE_ACCOUNT_NAME'&&sasToken!=='YOUR_SAS_TOKEN'
-      &&account.length>0&&sasToken.length>0;
+    return account!=='YOUR_STORAGE_ACCOUNT_NAME'
+      && sasToken!=='YOUR_SAS_TOKEN'
+      && account.length>0 && sasToken.length>0;
   }
 
   _makeCode(){ return String(Math.floor(1000+Math.random()*9000)); }
-  // The "share code" shown to users = the JSONBlob ID (full, so another device can fetch)
-  // We keep a separate short 4-digit display code for the UI label,
-  // but the actual resume code is the blobId.
 
-  _azureUrl(c){
+  _url(code){
     const{account,container,sasToken}=AZURE_CONFIG;
-    return`https://${account}.blob.core.windows.net/${container}/game-${c}.json?${sasToken}`;
+    return`https://${account}.blob.core.windows.net/${container}/game-${code}.json?${sasToken}`;
   }
 
-  // ── Azure ──────────────────────────────────────────────────────────────
-  async _azurePut(c,d){
-    const r=await fetch(this._azureUrl(c),{
+  async _put(code,data){
+    const r=await fetch(this._url(code),{
       method:'PUT',
       headers:{'Content-Type':'application/json','x-ms-blob-type':'BlockBlob'},
-      body:JSON.stringify(d)
+      body:JSON.stringify(data),
     });
-    if(!r.ok) throw new Error(`Azure PUT ${r.status}`);
+    if(!r.ok) throw new Error(`Azure PUT ${r.status} ${r.statusText}`);
   }
-  async _azureGet(c){
-    const r=await fetch(this._azureUrl(c));
-    if(!r.ok) throw new Error(`Azure GET ${r.status}`);
+
+  async _get(code){
+    const r=await fetch(this._url(code));
+    if(!r.ok) throw new Error(`Azure GET ${r.status} ${r.statusText}`);
     return r.json();
   }
 
-  // ── JSONBlob ───────────────────────────────────────────────────────────
-  async _jbCreate(d){
-    const r=await fetch(JSONBLOB_API,{
-      method:'POST',
-      headers:{'Content-Type':'application/json','Accept':'application/json'},
-      body:JSON.stringify(d)
-    });
-    if(!r.ok) throw new Error(`JSONBlob POST ${r.status}`);
-    const loc=r.headers.get('Location')||'';
-    const id=loc.split('/').pop();
-    if(!id) throw new Error('No JSONBlob ID returned');
-    return id;
-  }
-  async _jbUpdate(id,d){
-    const r=await fetch(`${JSONBLOB_API}/${id}`,{
-      method:'PUT',
-      headers:{'Content-Type':'application/json','Accept':'application/json'},
-      body:JSON.stringify(d)
-    });
-    if(!r.ok) throw new Error(`JSONBlob PUT ${r.status}`);
-  }
-  async _jbGet(id){
-    const r=await fetch(`${JSONBLOB_API}/${id}`,{
-      headers:{'Accept':'application/json'}
-    });
-    if(!r.ok) throw new Error(`JSONBlob GET ${r.status}`);
-    return r.json();
-  }
-
-  // ── read: used by resumeByCode ────────────────────────────────────────
-  // The "code" shared between devices is the JSONBlob ID (numeric string ~18 digits).
-  // We display a 4-digit short code locally, but share the full blobId for cross-device resume.
+  // ── read: called by resumeByCode ──────────────────────────────────────
   async read(code){
-    const trimmed=code.trim();
-    // Azure (if configured): 4-digit code maps to azure blob
-    if(this.isAzureConfigured && /^\d{4}$/.test(trimmed)){
-      try{ return await this._azureGet(trimmed); }catch(e){}
+    const c=code.trim().toUpperCase().replace(/[^0-9]/g,'').slice(0,4);
+    if(!c||c.length!==4) throw new Error('Enter a valid 4-digit game code');
+    if(!this.isConfigured){
+      // Azure not configured — fall back to local cache (same device only)
+      const local=GameState.loadLocal();
+      if(local&&local.gameCode===c) return local.data;
+      throw new Error('Azure not configured — resume only works on the same device');
     }
-    // Direct JSONBlob fetch — trimmed is the blobId
-    try{ return await this._jbGet(trimmed); }catch(e){}
-    // Same-device local cache fallback
-    const local=GameState.loadLocal();
-    if(local&&(local.gameCode===trimmed||local.blobId===trimmed)){
-      return local.data;
-    }
-    throw new Error('Game not found — check the code and try again');
+    return this._get(c);
   }
 
-  // ── schedule: saves to cloud on every meaningful action ───────────────
-  schedule(data,onStart,onDone,onErr,onFallback){
+  // ── schedule: debounced save ───────────────────────────────────────────
+  schedule(data,onStart,onDone,onErr){
     clearTimeout(this._t);
     this._t=setTimeout(async()=>{
       onStart();
-      // Assign game code on first save
       if(!this.gameCode) this.gameCode=this._makeCode();
-
-      // Always write to localStorage first
+      // Always cache locally
       try{
-        localStorage.setItem(LOCAL_KEY,JSON.stringify({
-          gameCode:this.gameCode, blobId:this.blobId||null, data
-        }));
+        localStorage.setItem(LOCAL_KEY,JSON.stringify({gameCode:this.gameCode,data}));
       }catch(e){}
-
-      // Azure (preferred if configured)
-      if(this.isAzureConfigured){
-        try{
-          await this._azurePut(this.gameCode,data);
-          this._mode='azure';
-          onDone(this.gameCode);
-          return;
-        }catch(e){
-          console.warn('Azure save failed, trying JSONBlob:',e.message);
-        }
+      if(!this.isConfigured){
+        // No Azure — local only, still call onDone so code shows
+        onDone(this.gameCode);
+        return;
       }
-
-      // JSONBlob fallback (always available, no config needed)
       try{
-        if(this.blobId) await this._jbUpdate(this.blobId,data);
-        else{
-          this.blobId=await this._jbCreate(data);
-          // Use the blobId as the share code — it's what other devices need to resume
-          this.gameCode=this.blobId;
-        }
-        // Persist to localStorage
-        try{
-          localStorage.setItem(LOCAL_KEY,JSON.stringify({
-            gameCode:this.gameCode, blobId:this.blobId, data
-          }));
-        }catch(e){}
-        this._mode='jsonblob';
+        await this._put(this.gameCode,data);
         onDone(this.gameCode);
       }catch(e){
-        console.warn('JSONBlob save failed, local only:',e.message);
-        this._mode='local';
-        onFallback&&onFallback(e.message);
+        console.error('Azure save error:',e.message);
+        onErr(e);
       }
     },900);
   }
@@ -445,7 +379,7 @@ class PlayerResult {
     // Losers pay at nominal rate; winners are paid at winnerRate
     const appliedRate=this.netChips>=0?this.winnerRate:this.rate;
     this.netRupees=Math.round(this.netChips*appliedRate)-expenseShare;
-    Object.freeze(this);
+    // Note: not frozen so surplus gap redistribution can adjust netRupees
   }
   get isWinner(){return this.netRupees>0;}
   get isLoser(){return this.netRupees<0;}
@@ -580,7 +514,7 @@ class GameState {
     this.buyDraft=d.buyDraft||{};this.chipDraft=d.chipDraft||{};
     this.showPayout=d.showPayout||false;this.chipRate=d.chipRate||0.5;this.forceSettle=d.forceSettle||false;this.paidTransfers=d.paidTransfers||{};this.exitPayments=(d.exitPayments||[]).map(ExitPayment.fromJSON);
   }
-  saveLocal(gameCode,blobId=null){try{localStorage.setItem(LOCAL_KEY,JSON.stringify({gameCode,blobId,data:this.toJSON()}));}catch(e){}}
+  saveLocal(gameCode){try{localStorage.setItem(LOCAL_KEY,JSON.stringify({gameCode,data:this.toJSON()}));}catch(e){}}
   static loadLocal(){try{const r=localStorage.getItem(LOCAL_KEY);return r?JSON.parse(r):null;}catch(e){return null;}}
 }
 
@@ -599,9 +533,9 @@ class GameEngine {
   //   because: adjustedNet_p = netChips_p × winnerRate
   //   (same proportional deduction, simpler to apply via a rate)
   //
-  // SURPLUS (counted > bought): single adjusted rate for ALL players.
-  //   adjustedRate = totalBought(₹) ÷ totalChipsRemaining(chips)
-  //   Applied to everyone — extra chips dilute each chip's value equally.
+  // SURPLUS (counted > bought): adjustedRate = totalBought(₹) / totalChipsRemaining applied to ALL.
+  //   600 extra chips reduce each chip's value equally for everyone.
+  //   Rounding gap redistributed proportionally across winners so greedy balances.
   //
   static _getRates(state){
     const nom=state.chipRate;
@@ -612,8 +546,9 @@ class GameEngine {
     const isSurplus=tr>ti;
 
     if(isSurplus){
-      // SURPLUS: extra chips exist — single adjusted rate for everyone
-      // adjustedRate = totalBought(₹) ÷ totalCounted(chips)
+      // SURPLUS: adjustedRate = totalBought(₹) / totalChipsRemaining
+      // Applied to ALL players — 600 extra chips reduce each chip's value equally.
+      // After rounding, any residual gap is redistributed proportionally across winners.
       const surplusRate=(ti*nom)/tr;
       return{isSurplus:true,nomRate:surplusRate,winnerRate:surplusRate,surplusRate};
 
@@ -647,9 +582,11 @@ class GameEngine {
   }
 
   static computeResults(state){
-    const {nomRate,winnerRate}=GameEngine._getRates(state);
+    const {isSurplus,nomRate,winnerRate}=GameEngine._getRates(state);
     const applyAdj=state.forceSettle;
-    return state.players.map(p=>new PlayerResult({
+
+    // First pass: compute adjusted nets for all players
+    const results=state.players.map(p=>new PlayerResult({
       id:p.id,name:p.name,color:p.color,
       bought:p.totalBought,
       chipsRemaining:state.chipsFor(p.id),
@@ -658,6 +595,21 @@ class GameEngine {
       rate:    applyAdj?nomRate   :state.chipRate,
       winnerRate:applyAdj?winnerRate:state.chipRate,
     }));
+
+    // For surplus with force-settle: redistribute the rounding gap across winners
+    // so every transfer balances to zero (the ~₹300 gap is spread proportionally)
+    if(applyAdj&&isSurplus){
+      const gap=results.reduce((s,r)=>s+r.netRupees,0);
+      if(Math.abs(gap)>=1){
+        const totalWinNet=results.reduce((s,r)=>s+(r.netRupees>0?r.netRupees:0),0);
+        if(totalWinNet>0) results.forEach(r=>{
+          if(r.netRupees>0){
+            r.netRupees=r.netRupees-Math.round(gap*r.netRupees/totalWinNet);
+          }
+        });
+      }
+    }
+    return results;
   }
 
   // For comparison display — pass explicit rates
@@ -842,7 +794,7 @@ class SetupRenderer extends BaseRenderer {
         <div class="resume-card">
           <div class="resume-title">☁ Resume a game from another device</div>
           <div class="resume-row">
-            <input class="resume-inp" id="resume-code" placeholder="Paste game code from another device" autocomplete="off" maxlength="25">
+            <input class="resume-inp" id="resume-code" placeholder="4-digit code (e.g. 4291)" autocomplete="off" maxlength="25">
             <button class="sbtn green" onclick="app.resumeByCode()" style="padding:8px 13px;">Load →</button>
           </div>
         </div>
@@ -1355,7 +1307,7 @@ class PokerApp {
     this._root=document.getElementById('app');
     const local=GameState.loadLocal();
     if(local&&local.gameCode&&local.data){
-      this.state.fromJSON(local.data);this.cloud.gameCode=local.gameCode;this.cloud.blobId=local.blobId||null;this._syncBar('ok');
+      this.state.fromJSON(local.data);this.cloud.gameCode=local.gameCode;this._syncBar('ok');
     }
     this.render();
   }
@@ -1487,20 +1439,19 @@ class PokerApp {
   // Resume
   async resumeByCode(){
     const inp=document.getElementById('resume-code');
-    const code=(inp?inp.value.trim():'');
-    if(!code){this.toast('Enter a game code first','err');return;}
+    const raw=inp?inp.value.trim():'';
+    if(!raw){this.toast('Enter a 4-digit code','err');return;}
     this.toast('Loading…');
     try{
-      const data=await this.cloud.read(code);
+      const data=await this.cloud.read(raw);
+      const code=raw.replace(/[^0-9]/g,'').slice(0,4);
       this.state.fromJSON(data);
-      // The code entered IS the blobId (or azure code) — use it for future saves
       this.cloud.gameCode=code;
-      this.cloud.blobId=code;
-      this.state.saveLocal(code,code);
+      this.state.saveLocal(code);
       this._syncBar('ok');this.render();this.toast('Game resumed ✓');
     }catch(e){
       console.error('Resume error:',e);
-      this.toast('Code not found — check the code and try again','err');
+      this.toast(e.message||'Code not found','err');
     }
   }
 
@@ -1562,8 +1513,8 @@ class PokerApp {
       let totalWinChips=0;
       this.state.players.forEach(p=>{const net=this.state.chipsFor(p.id)-p.totalBought;if(net>0)totalWinChips+=net;});
       const methodNote=isSurplus
-        ?`All chips worth less: ₹${(ti*nom).toLocaleString()} pot ÷ ${tr.toLocaleString()} chips counted = ₹${fmtR(rates.surplusRate)}/chip for everyone`
-        :`Losers pay ₹${nom}/chip (unchanged). Winners absorb the ${shortageChips.toLocaleString()}-chip shortfall proportionally:\nWinner rate = ₹${nom}/chip × (${totalWinChips} win chips − ${shortageChips} missing) ÷ ${totalWinChips} win chips = ₹${fmtR(rates.winnerRate)}/chip`;
+        ?`All players: adjusted rate = ₹${(ti*nom).toLocaleString()} ÷ ${tr.toLocaleString()} chips = ₹${fmtR(rates.surplusRate)}/chip (vs ₹${nom} nominal). ${tr-ti} surplus chips reduce everyone's value proportionally.`
+        :`Losers pay ₹${nom}/chip (unchanged). Winners absorb the ${shortageChips.toLocaleString()}-chip shortfall proportionally. Winner rate = ₹${nom} × (${totalWinChips}−${shortageChips}) ÷ ${totalWinChips} = ₹${fmtR(rates.winnerRate)}/chip`;
 
       const rows=this.state.players.map(p=>{
         const before=nomResults.find(r=>r.id===p.id);
