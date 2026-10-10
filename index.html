@@ -77,6 +77,9 @@ html,body{height:100%;background:var(--bg);font-family:var(--font);-webkit-font-
 .px{color:var(--muted);font-size:12px;cursor:pointer;padding-left:2px;}
 .px:hover{color:var(--red);}
 .buy-inp-row{display:flex;gap:6px;}
+.preset-buy-row{display:flex;gap:5px;flex-wrap:wrap;margin-bottom:2px;}
+.preset-buy-btn{padding:6px 12px;border-radius:8px;border:1px solid var(--brd2);background:var(--bg3);color:var(--gold);font-size:14px;font-weight:600;cursor:pointer;font-family:var(--font);transition:background .12s,border-color .12s;}
+.preset-buy-btn:hover{background:var(--brd);border-color:var(--gold);}
 
 /* Exit inline panel */
 .exit-panel{background:var(--bg3);border:1px solid var(--brd);border-radius:8px;padding:8px 10px;margin:6px 0 0;display:flex;flex-direction:column;gap:6px;}
@@ -403,7 +406,6 @@ class GameState {
   constructor(){this._nid=1;this._init();}
   _init(){
     this.screen=SCREENS.SETUP;
-    this.players=[];
     this.newName='';
     this.expenses=[new Expense(this._nid++,'Room Rent',0,[])];
     this.buyDraft={};
@@ -412,10 +414,17 @@ class GameState {
     this.chipRate=0.5;
     this.forceSettle=false;   // true = mismatch overridden by proportional adjustment
     this.exitPayments=[];    // ExitPayment[] — cash settled at exit time
-    this.paidTransfers={};  // key: "from→to", value: true/false            // rupees per 1 chip
+    this.paidTransfers={};  // key: "from→to", value: true/false
     this.expandedPlayer=null;
     this.exitingPlayer=null;
     this.editingExitPlayer=null;  // player whose exit is being corrected
+    // Default players with 3000-chip initial buy
+    const defaultNames=['Avinash','Srinath','Pramod','Krishna','Roop','Kaushik','Amar','Praveen','Vasu','Srikanth','Vamshi','Srini','Sridhar','Tej','Vishnu'];
+    this.players=defaultNames.map((name,i)=>{
+      const p=new Player(this._nid++,name,COLORS[i%COLORS.length]);
+      p.addBuy(this._nid++,3000);
+      return p;
+    });
   }
   reset(){this._nid=1;this._init();}
   nextId(){return this._nid++;}
@@ -449,8 +458,8 @@ class GameState {
   }
   removePlayer(id){this.players=this.players.filter(p=>p.id!==id);}
 
-  addBuy(pid){
-    const amt=parseInt(this.buyDraft[pid]||'0');
+  addBuy(pid,directAmt){
+    const amt=directAmt||parseInt(this.buyDraft[pid]||'0');
     if(!amt||amt<=0)return false;
     const p=this.getPlayer(pid);if(!p||p.exited)return false;
     p.addBuy(this.nextId(),amt);this.buyDraft[pid]='';return true;
@@ -799,7 +808,7 @@ class SetupRenderer extends BaseRenderer {
           </div>
         </div>
         <div class="row" style="margin-bottom:12px;">
-          <input id="ni" class="inp f1" placeholder="Player name..." value="${this.esc(this.state.newName)}" autocomplete="off">
+          <input id="ni" class="inp f1" placeholder="Add player..." value="${this.esc(this.state.newName)}" autocomplete="off">
           <button onclick="app.addPlayer()" style="padding:9px 15px;border-radius:9px;border:none;background:${this.state.newName.trim()?'#2A5A35':'#1A2A1E'};color:var(--gold);font-size:21px;cursor:pointer;flex-shrink:0;margin-left:8px;">+</button>
         </div>
         ${empty}${list}
@@ -848,10 +857,16 @@ class GameRenderer extends BaseRenderer {
     // Expanded detail: buy pills + inline input + exit panel
     let detail = '';
     if(isExpanded && !p.exited){
+      const presets=[2000,3000,4000,5000,6000,7000,8000,9000,10000];
+      const presetBtns=presets.map(v=>`<button class="preset-buy-btn" onclick="event.stopPropagation();app.addBuyAndCollapse(${p.id},${v})">${v/1000}k</button>`).join('');
       detail=`<div class="prow-detail">
         ${pills?`<div class="strip">${pills}</div>`:''}
+        <div style="margin-bottom:6px;">
+          <div style="font-size:11px;color:var(--muted);margin-bottom:4px;text-transform:uppercase;letter-spacing:.5px;">Quick buy (chips)</div>
+          <div class="preset-buy-row">${presetBtns}</div>
+        </div>
         <div class="buy-inp-row">
-          <input id="bi${p.id}" type="number" class="inp sm f1" placeholder="chips" value="${this.esc(this.state.buyDraft[p.id]||'')}">
+          <input id="bi${p.id}" type="number" class="inp sm f1" placeholder="Other amount (chips)" value="${this.esc(this.state.buyDraft[p.id]||'')}">
           <button class="sbtn green" onclick="app.addBuy(${p.id})" style="padding:7px 13px;">+ Buy</button>
         </div>
         ${isExiting?this._exitPanel(p):''}
@@ -1326,7 +1341,8 @@ class PokerApp {
   removePlayer(id){this.state.removePlayer(id);this.scheduleSync();this.render();}
 
   // Buys
-  addBuy(pid){if(this.state.addBuy(pid)){this.scheduleSync();this.render();}}
+  addBuy(pid,amt){if(this.state.addBuy(pid,amt)){this.scheduleSync();this.render();}}
+  addBuyAndCollapse(pid,amt){if(this.state.addBuy(pid,amt)){this.state.expandedPlayer=null;this.scheduleSync();this.render();}}
   addBuyPrompt(pid){
     // expand the row and focus the input
     this.state.expandedPlayer=pid;
