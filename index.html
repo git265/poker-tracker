@@ -61,7 +61,10 @@ html,body{height:100%;background:var(--bg);font-family:var(--font);-webkit-font-
 .prow-accent{width:4px;flex-shrink:0;align-self:stretch;}
 .prow-main{flex:1;padding:8px 10px;min-width:0;}
 .prow-top{display:flex;align-items:center;gap:8px;}
-.prow-name{font-size:16px;font-weight:700;color:var(--text);flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.prow-name{font-size:16px;font-weight:700;color:var(--text);flex:1;min-width:0;white-space:nowrap;overflow:hidden;}
+.buys-total{position:sticky;top:0;z-index:5;display:flex;align-items:center;justify-content:space-between;gap:8px;background:var(--bg3);border:1px solid var(--brd2);border-radius:10px;padding:8px 12px;margin-bottom:8px;}
+.buys-total .bt-val{font-size:18px;font-weight:700;color:var(--gold);white-space:nowrap;}
+.buys-total .bt-sub{font-size:12px;color:var(--muted);white-space:nowrap;text-align:right;}
 .prow-stats{font-size:13px;color:var(--muted);white-space:nowrap;}
 .prow-btns{display:flex;align-items:center;gap:0;flex-shrink:0;}
 .prow-add{padding:8px 12px;background:none;border:none;border-left:1px solid var(--brd);color:var(--green2);font-size:20px;cursor:pointer;font-family:var(--font);transition:background .15s;}
@@ -77,6 +80,10 @@ html,body{height:100%;background:var(--bg);font-family:var(--font);-webkit-font-
 .px{color:var(--muted);font-size:12px;cursor:pointer;padding-left:2px;}
 .px:hover{color:var(--red);}
 .buy-inp-row{display:flex;gap:6px;}
+.res-line{display:flex;align-items:center;gap:8px;background:var(--bg2);border:1px solid var(--brd);border-radius:10px;padding:8px 11px;margin-bottom:5px;}
+.res-name{flex:1;min-width:0;font-size:15px;font-weight:700;color:var(--text);white-space:nowrap;overflow:hidden;}
+.res-chips{font-size:12px;color:var(--muted);white-space:nowrap;flex-shrink:0;}
+.res-amt{font-size:16px;font-weight:700;white-space:nowrap;flex-shrink:0;min-width:64px;text-align:right;}
 .preset-buy-row{display:flex;gap:5px;flex-wrap:wrap;margin-bottom:2px;}
 .preset-buy-btn{padding:6px 12px;border-radius:8px;border:1px solid var(--brd2);background:var(--bg3);color:var(--gold);font-size:14px;font-weight:600;cursor:pointer;font-family:var(--font);transition:background .12s,border-color .12s;}
 .preset-buy-btn:hover{background:var(--brd);border-color:var(--gold);}
@@ -193,7 +200,7 @@ select.inp{cursor:pointer;}
 <div class="shell">
   <div class="phone">
     <div id="app" style="display:flex;flex-direction:column;flex:1;overflow:hidden;"></div>
-    <div id="modal" class="modal-bg" style="display:none;position:absolute;inset:0;background:rgba(0,0,0,.8);display:none;align-items:center;justify-content:center;z-index:200;border-radius:0;overflow-y:auto;"></div>
+    <div id="modal" class="modal-bg" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.8);display:none;align-items:center;justify-content:center;z-index:200;border-radius:0;overflow-y:auto;"></div>
     <div id="toast-area"></div>
   </div>
 </div>
@@ -562,63 +569,69 @@ class GameEngine {
       return{isSurplus:true,nomRate:surplusRate,winnerRate:surplusRate,surplusRate};
 
     } else {
-      // SHORTAGE: fewer chips counted than bought — losers pay full nominal rate,
-      // winners absorb the shortfall proportionally to their raw win amount.
+      // SHORTAGE: fewer chips counted than bought.
+      // Losers' combined chip loss is LARGER than winners' combined gain by exactly
+      // the shortage, so losers pay nominal and winners split that whole pot
+      // in proportion to their winning chips (books must balance to zero).
       //
-      // Formula:
-      //   shortageChips   = ti − tr                       (positive)
-      //   totalWinChips   = Σ netChips for winners
-      //   winnerRate      = nom × (totalWinChips − shortageChips) / totalWinChips
+      //   totalLoseChips = Σ |netChips| for losers
+      //   totalWinChips  = Σ netChips for winners   (= totalLoseChips − shortage)
+      //   winnerRate     = nom × totalLoseChips / totalWinChips
       //
-      // Each winner's payout = netChips × winnerRate
-      //   = netChips × nom × (1 − shortageChips/totalWinChips)
-      //   = rawWin − rawWin × (shortageChips/totalWinChips)
-      //   = rawWin − shortfall₹ × (rawWin/totalRawWin)   ← proportional deduction ✓
-      //
-      // winnerRate is always < nom when shortageChips > 0.
-      // Capped at 0 in extreme edge cases where shortage ≥ total winner chips.
-      const shortageChips=ti-tr;
-      let totalWinChips=0;
+      // (Old formula subtracted the shortage a second time, leaving
+      //  2 × shortage × nom of loser money with no recipient.)
+      let totalWinChips=0,totalLoseChips=0;
       state.players.forEach(p=>{
         const net=state.chipsFor(p.id)-p.totalBought;
-        if(net>0) totalWinChips+=net;
+        if(net>0) totalWinChips+=net; else if(net<0) totalLoseChips+=-net;
       });
-      const winnerRate=totalWinChips>0
-        ? Math.max(0, nom*(totalWinChips-shortageChips)/totalWinChips)
-        : nom;
-      return{isSurplus:false,nomRate:nom,winnerRate,surplusRate:nom};
+      const winnerRate=totalWinChips>0 ? nom*totalLoseChips/totalWinChips : nom;
+      return{isSurplus:false,nomRate:nom,winnerRate,surplusRate:nom,totalWinChips,totalLoseChips};
     }
   }
 
-  static computeResults(state){
-    const {isSurplus,nomRate,winnerRate}=GameEngine._getRates(state);
-    const applyAdj=state.forceSettle;
-
-    // First pass: compute adjusted nets for all players
+  // ─── Equal split of chip mismatch ─────────────────────────────────────
+  // Everyone is first settled at the nominal rate. The books are then off by
+  // gap = Σ nets (₹) = (counted − bought) × rate. That gap is split equally
+  // among ALL players (exited included):
+  //   surplus  (gap > 0) → every player pays gap/N
+  //   shortage (gap < 0) → every player gets |gap|/N back
+  // Integer rupees are spread so the shares add up to exactly the gap.
+  static computeResults(state, forceOverride){
+    const applyAdj=forceOverride!==undefined?forceOverride:state.forceSettle;
     const results=state.players.map(p=>new PlayerResult({
       id:p.id,name:p.name,color:p.color,
       bought:p.totalBought,
       chipsRemaining:state.chipsFor(p.id),
       expenseShare:state.totalExpenseShareFor(p.id),
       exited:p.exited,
-      rate:    applyAdj?nomRate   :state.chipRate,
-      winnerRate:applyAdj?winnerRate:state.chipRate,
+      rate:state.chipRate,winnerRate:state.chipRate,
     }));
-
-    // For surplus with force-settle: redistribute the rounding gap across winners
-    // so every transfer balances to zero (the ~₹300 gap is spread proportionally)
-    if(applyAdj&&isSurplus){
+    results.forEach(r=>{r.nominalNet=r.netRupees;r.splitAdj=0;});
+    const b=GameEngine.getBalanceStatus(state);
+    if(applyAdj&&b.status==='mismatch'){
       const gap=results.reduce((s,r)=>s+r.netRupees,0);
-      if(Math.abs(gap)>=1){
-        const totalWinNet=results.reduce((s,r)=>s+(r.netRupees>0?r.netRupees:0),0);
-        if(totalWinNet>0) results.forEach(r=>{
-          if(r.netRupees>0){
-            r.netRupees=r.netRupees-Math.round(gap*r.netRupees/totalWinNet);
-          }
-        });
-      }
+      const n=results.length;
+      const share=gap/n;
+      results.forEach((r,i)=>{
+        const take=Math.round(share*(i+1))-Math.round(share*i);
+        r.splitAdj=-take;
+        r.netRupees-=take;
+      });
     }
     return results;
+  }
+
+  // Summary numbers for the equal-split explanation
+  static equalSplitInfo(state){
+    const nom=state.chipRate;
+    const ti=state.totalInPlay, tr=state.totalChipsEntered;
+    const diffChips=tr-ti;
+    const nominal=GameEngine.computeResults(state,false);
+    const gap=nominal.reduce((s,r)=>s+r.netRupees,0);
+    const n=state.players.length||1;
+    return{isSurplus:diffChips>0,diffChips:Math.abs(diffChips),gapRupees:Math.abs(gap),
+      n,perPlayer:Math.abs(gap)/n,nom,ti,tr};
   }
 
   // For comparison display — pass explicit rates
@@ -676,6 +689,30 @@ class GameEngine {
     if(filled===0)return{status:'waiting',diff};
     return{status:filled<total?'partial':diff===0?'balanced':'mismatch',diff};
   }
+}
+
+// ══ Equal-split summary (shared by popup + payout section) ═══════════════
+function splitSummaryHTML(state){
+  const s=GameEngine.equalSplitInfo(state);
+  const R=n=>'₹'+Math.round(n).toLocaleString();
+  const col=s.isSurplus?'var(--amber)':'var(--green2)';
+  const verb=s.isSurplus?'pays':'gets back';
+  const exact=Number.isInteger(s.perPlayer)?R(s.perPlayer):'₹'+s.perPlayer.toFixed(2);
+  const line=(k,v)=>`<div style="display:flex;justify-content:space-between;gap:8px;font-size:13px;padding:2px 0;"><span style="color:var(--muted);">${k}</span><span style="color:var(--text);white-space:nowrap;">${v}</span></div>`;
+  return`<div style="background:var(--bg3);border:1px solid ${s.isSurplus?'var(--amber)':'var(--brd2)'};border-radius:10px;padding:9px 12px;margin:8px 0;">
+    <div style="font-size:14px;font-weight:700;color:${col};margin-bottom:4px;">Mismatch split equally</div>
+    ${line('Chips bought',s.ti.toLocaleString())}
+    ${line('Chips counted',s.tr.toLocaleString())}
+    ${line(s.isSurplus?'Extra chips':'Missing chips',`${s.diffChips.toLocaleString()} × ₹${s.nom} = ${R(s.gapRupees)}`)}
+    ${line('Players',s.n)}
+    <div style="display:flex;justify-content:space-between;gap:8px;font-size:14px;font-weight:700;padding-top:5px;margin-top:4px;border-top:1px solid var(--brd);">
+      <span style="color:var(--muted);">Each player ${verb}</span>
+      <span style="color:${col};white-space:nowrap;">${R(s.gapRupees)} ÷ ${s.n} = ${exact}</span>
+    </div>
+    <div style="font-size:12px;color:var(--muted);margin-top:4px;">${s.isSurplus
+      ?'More chips on the table than were paid for, so everyone chips in equally to cover them.'
+      :'More cash in the pot than the chips counted, so everyone gets an equal share back.'}${Number.isInteger(s.perPlayer)?'':' Rupees are rounded so the total balances exactly.'}</div>
+  </div>`;
 }
 
 // ══ ForceSettleWarning ════════════════════════════════════════════════════
@@ -831,7 +868,14 @@ class GameRenderer extends BaseRenderer {
   render(){
     const rows=this.state.players.map(p=>this._playerRow(p)).join('');
     const activeCnt=this.state.activePlayers.length;
-    return`${this.navBar()}<div class="body">${rows}</div>
+    const total=this.state.totalInPlay;
+    const buys=this.state.players.reduce((s,p)=>s+p.buyCount,0);
+    const totalBar=`<div class="buys-total">
+      <div><div style="font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;">Total chips</div>
+        <div class="bt-val">${total.toLocaleString()}</div></div>
+      <div class="bt-sub">${buys} buys · ${this.state.players.length} players<br>= ${this.fmt(Math.round(total*this.state.chipRate))}</div>
+    </div>`;
+    return`${this.navBar()}<div class="body">${totalBar}${rows}</div>
       <div class="foot">${this.pbtn('Done — Set Expenses →',"app.goTo('expenses')")}</div>`;
   }
 
@@ -847,7 +891,7 @@ class GameRenderer extends BaseRenderer {
       <div class="prow-main" onclick="app.toggleExpand(${p.id})" style="cursor:pointer;">
         <div class="prow-top">
           <div class="prow-name">${this.esc(p.name)}${exitedBadge}</div>
-          <div class="prow-stats">${p.buyCount>0?`${p.buyCount}× · <span style="color:${p.color};font-weight:700;">${p.totalBought.toLocaleString()} chips</span>`:'<span style="color:var(--brd2);">no buys</span>'}</div>
+          <div class="prow-stats">${p.buyCount>0?`${p.buyCount}× · <span style="color:${p.color};font-weight:700;">${p.totalBought.toLocaleString()}</span>`:'<span style="color:var(--brd2);">no buys</span>'}</div>
         </div>
       </div>`;
 
@@ -1082,8 +1126,8 @@ class SummaryRenderer extends BaseRenderer {
       return this.card(`
       <div class="row" style="margin-bottom:6px;">
         <div style="width:8px;height:8px;border-radius:50%;background:${p.color};flex-shrink:0;"></div>
-        <div class="f1"><div style="color:var(--text);font-size:15px;font-weight:700;">${this.esc(p.name)}</div></div>
-        <div style="color:var(--muted);font-size:13px;">Bought ${p.totalBought.toLocaleString()} chips</div>
+        <div class="f1" style="min-width:0;"><div style="color:var(--text);font-size:15px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${this.esc(p.name)}</div></div>
+        <div style="color:var(--muted);font-size:13px;white-space:nowrap;flex-shrink:0;">Bought ${p.totalBought.toLocaleString()} chips</div>
       </div>
       <input id="cp${p.id}" type="number" class="inp sm" placeholder="Chips remaining" value="${this.esc(this.state.chipDraft[p.id]||'')}">
       ${calcBlock}`);
@@ -1151,10 +1195,8 @@ class SummaryRenderer extends BaseRenderer {
         title:`Mismatch ${b.diff>0?'+':''}${Math.abs(b.diff).toLocaleString()} chips`,
         sub:(()=>{
           if(!settled)return`${this.state.totalChipsEntered.toLocaleString()} counted vs ${this.state.totalInPlay.toLocaleString()} in play`;
-          const r=GameEngine._getRates(this.state);
-          return r.isSurplus
-            ?`Force settle ON · all at ₹${r.surplusRate.toFixed(3)}/chip`
-            :`Force settle ON · losers ₹${this.state.chipRate}/chip · winners ₹${r.winnerRate.toFixed(3)}/chip`;
+          const s=GameEngine.equalSplitInfo(this.state);
+          return`Force settle ON · split equally · ${s.isSurplus?'each pays':'each gets'} ≈ ₹${Math.round(s.perPlayer).toLocaleString()}`;
         })()},
     };
     const c=cfgs[b.status]||cfgs.waiting;
@@ -1182,18 +1224,15 @@ class SummaryRenderer extends BaseRenderer {
 
   _payoutSection(results){
     const T=GameEngine.computeTransfers(results, this.state.exitPayments||[]);
-    const rCards=results.map(r=>this.card(`
-      <div class="row">
+    const k=n=>n>=1000?(Math.round(n/100)/10).toLocaleString()+'k':n.toLocaleString();
+    const rCards=results.map(r=>`<div class="res-line" style="border-color:${r.borderColor};" title="Bought ${r.bought.toLocaleString()} · Left ${r.chipsRemaining.toLocaleString()} chips">
         <div style="width:8px;height:8px;border-radius:50%;background:${r.color};flex-shrink:0;"></div>
-        <div class="f1" style="padding-left:4px;">
-          <div style="color:var(--text);font-size:15px;font-weight:700;">${this.esc(r.name)}${r.exited?`<span class="exited-badge">exited</span>`:''}</div>
-          <div style="color:var(--muted);font-size:12px;">Bought ${r.bought.toLocaleString()} chips · Left ${r.chipsRemaining.toLocaleString()} chips${r.expenseShare!==0?` · Exp ${r.expenseShare<0?'<span style="color:var(--amber)">+'+this.fmt(Math.abs(r.expenseShare))+'</span>':this.fmt(r.expenseShare)}`:''}</div>
-        </div>
-        <div style="text-align:right;">
-          <div style="color:${r.netColor};font-size:20px;font-weight:700;">${r.netFormatted}</div>
-          <div style="font-size:12px;color:${r.labelColor};">${r.label}</div>
-        </div>
-      </div>`,`border-color:${r.borderColor}`)).join('');
+        <div class="res-name">${this.esc(r.name)}${r.exited?'<span class="exited-badge">exited</span>':''}</div>
+        <div class="res-chips">${k(r.bought)} → ${k(r.chipsRemaining)}${r.expenseShare!==0?` <span style="color:${r.expenseShare<0?'var(--amber)':'var(--red)'};">exp ${r.expenseShare<0?'+':'−'}${this.fmt(Math.abs(r.expenseShare))}</span>`:''}</div>
+        <div class="res-amt" style="color:${r.netColor};">${r.netFormatted}</div>
+      </div>`).join('');
+    const isSplit=this.state.forceSettle&&GameEngine.getBalanceStatus(this.state).status==='mismatch';
+    const splitCard=isSplit?`<div class="tag" style="margin-top:12px;">Force Settle Summary</div>${splitSummaryHTML(this.state)}`:'';
 
     const tCards=T.length?T.map(t=>{
       const key=`${t.from}→${t.to}`;
@@ -1203,10 +1242,10 @@ class SummaryRenderer extends BaseRenderer {
           <div style="width:8px;height:8px;border-radius:50%;background:${t.fromColor};flex-shrink:0;"></div>
           <div style="color:var(--amber);font-size:16px;font-weight:700;padding:0 6px;">→</div>
           <div style="width:8px;height:8px;border-radius:50%;background:${t.toColor};flex-shrink:0;"></div>
-          <div class="f1" style="padding-left:6px;font-size:14px;color:var(--text);">
+          <div class="f1" style="padding-left:6px;font-size:14px;color:var(--text);min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">
             <span style="color:${t.fromColor};">${this.esc(t.from)}</span> pays <span style="color:${t.toColor};">${this.esc(t.to)}</span>
           </div>
-          <div style="color:${paid?'var(--muted)':'var(--gold)'};font-size:18px;font-weight:700;${paid?'text-decoration:line-through;':''}">${this.fmt(t.amount)}</div>
+          <div style="color:${paid?'var(--muted)':'var(--gold)'};font-size:18px;font-weight:700;white-space:nowrap;flex-shrink:0;${paid?'text-decoration:line-through;':''}">${this.fmt(t.amount)}</div>
         </div>
         <div class="paid-toggle" onclick="app.togglePaid('${key}')">
           <div class="paid-check${paid?' done':''}${paid?' ✓':''}">${paid?'✓':''}</div>
@@ -1231,7 +1270,7 @@ class SummaryRenderer extends BaseRenderer {
       `,'border-color:var(--brd2);opacity:.7')).join('')}
     `:'';
 
-    return`<div class="tag" style="margin-top:12px;">Results</div>${rCards}<div class="tag" style="margin-top:12px;">Who Pays Whom</div>${tCards}${banner}${epSection}`;
+    return`${splitCard}<div class="tag" style="margin-top:12px;display:flex;justify-content:space-between;"><span>Results</span><span style="text-transform:none;letter-spacing:0;">bought → left (chips)</span></div>${rCards}<div class="tag" style="margin-top:12px;">Who Pays Whom</div>${tCards}${banner}${epSection}`;
   }
 }
 
@@ -1332,6 +1371,15 @@ class PokerApp {
     this._root.innerHTML=new(this._R[this.state.screen]||SetupRenderer)(this.state).render();
     this.binder.bind();
     this._refreshCodeDisplay();
+    this._fitNames();
+  }
+  // Shrink long player names so the full name fits on one line (no "…")
+  _fitNames(){
+    document.querySelectorAll('.prow-name,.res-name').forEach(el=>{
+      el.style.fontSize='';
+      let fs=parseFloat(getComputedStyle(el).fontSize);
+      while(el.scrollWidth>el.clientWidth&&fs>11){fs-=0.5;el.style.fontSize=fs+'px';}
+    });
   }
 
   goTo(screen){this.state.screen=screen;this.state.showPayout=false;this.scheduleSync();this.render();}
@@ -1510,47 +1558,25 @@ class PokerApp {
     if(checked){
       const m=document.getElementById('modal');
       const b=GameEngine.getBalanceStatus(this.state);
-      const rates=GameEngine._getRates(this.state);
-      const isSurplus=rates.isSurplus;
-      const nom=this.state.chipRate;
-      const ti=this.state.totalInPlay;
-      const tr=this.state.totalChipsEntered;
+      const isSurplus=b.diff>0;
       const diff=Math.abs(b.diff);
       const fmt=n=>'₹'+Math.abs(Math.round(n)).toLocaleString();
-      const fmtR=r=>r.toFixed(4);
+      const sgn=n=>(n>0?'+':n<0?'−':'')+fmt(n);
+      const adjResults=GameEngine.computeResults(this.state,true);
+      const methodNote=splitSummaryHTML(this.state);
 
-      // Before: everyone at nominal rate
-      const nomResults=GameEngine.computeResultsWithRate(this.state,nom,nom);
-      // After: apply the correct case
-      const adjResults=GameEngine.computeResultsWithRate(this.state,rates.nomRate,rates.winnerRate);
-
-      // Summary line explaining the method
-      const shortageChips=isSurplus?0:(ti-tr);
-      let totalWinChips=0;
-      this.state.players.forEach(p=>{const net=this.state.chipsFor(p.id)-p.totalBought;if(net>0)totalWinChips+=net;});
-      const methodNote=isSurplus
-        ?`All players: adjusted rate = ₹${(ti*nom).toLocaleString()} ÷ ${tr.toLocaleString()} chips = ₹${fmtR(rates.surplusRate)}/chip (vs ₹${nom} nominal). ${tr-ti} surplus chips reduce everyone's value proportionally.`
-        :`Losers pay ₹${nom}/chip (unchanged). Winners absorb the ${shortageChips.toLocaleString()}-chip shortfall proportionally. Winner rate = ₹${nom} × (${totalWinChips}−${shortageChips}) ÷ ${totalWinChips} = ₹${fmtR(rates.winnerRate)}/chip`;
-
-      const rows=this.state.players.map(p=>{
-        const before=nomResults.find(r=>r.id===p.id);
-        const after=adjResults.find(r=>r.id===p.id);
-        if(!before||!after)return'';
-        const delta=after.netRupees-before.netRupees;
-        const isWinner=before.netRupees>0;
-        const deltaStr=delta===0?'—':(delta>0?'+':'')+fmt(delta);
-        const role=isWinner?'<span style="font-size:11px;color:var(--amber);">winner</span>':'<span style="font-size:11px;color:var(--muted);">loser</span>';
+      const rows=adjResults.map(r=>{
+        const delta=r.splitAdj;
         return`<tr>
-          <td style="padding:6px 8px;">
-            <div style="display:flex;align-items:center;gap:5px;">
-              <div style="width:7px;height:7px;border-radius:50%;background:${p.color};flex-shrink:0;"></div>
-              <span style="font-size:13px;">${esc(p.name)}</span>
+          <td style="padding:5px 8px;max-width:110px;">
+            <div style="display:flex;align-items:center;gap:5px;min-width:0;">
+              <div style="width:7px;height:7px;border-radius:50%;background:${r.color};flex-shrink:0;"></div>
+              <span style="font-size:13px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${esc(r.name)}</span>
             </div>
-            <div style="padding-left:12px;">${role}</div>
           </td>
-          <td style="padding:6px 8px;font-size:13px;color:${before.netRupees>=0?'var(--green2)':'var(--red)'};">${before.netFormatted}</td>
-          <td style="padding:6px 8px;font-size:13px;color:${after.netRupees>=0?'var(--green2)':'var(--red)'};">${after.netFormatted}</td>
-          <td style="padding:6px 8px;font-size:12px;color:${delta<0?'var(--red)':delta>0?'var(--green2)':'var(--muted)'};">${deltaStr}</td>
+          <td style="padding:5px 8px;font-size:13px;white-space:nowrap;color:${r.nominalNet>0?'var(--green2)':r.nominalNet<0?'var(--red)':'var(--muted)'};">${sgn(r.nominalNet)}</td>
+          <td style="padding:5px 8px;font-size:13px;white-space:nowrap;font-weight:700;color:${r.netRupees>0?'var(--green2)':r.netRupees<0?'var(--red)':'var(--muted)'};">${sgn(r.netRupees)}</td>
+          <td style="padding:5px 8px;font-size:12px;white-space:nowrap;color:${delta<0?'var(--red)':delta>0?'var(--green2)':'var(--muted)'};">${delta===0?'—':sgn(delta)}</td>
         </tr>`;
       }).join('');
 
@@ -1559,17 +1585,13 @@ class PokerApp {
           <h3 style="color:${isSurplus?'var(--amber)':'var(--red)'};">
             ${isSurplus?'⚠ Chip Surplus':'⚠ Chip Shortage'} — ${diff.toLocaleString()} chips
           </h3>
-          <p class="warn-intro">
-            ${isSurplus
-              ?`${diff.toLocaleString()} extra chips counted — not backed by real money.`
-              :`${diff.toLocaleString()} chips missing — winners share the shortfall.`
-            }
-          </p>
-          <div class="warn-note" style="margin-bottom:10px;">${methodNote}</div>
+          ${methodNote}
+          <div style="flex:1;overflow-y:auto;min-height:0;scrollbar-width:none;">
           <table class="warn-table" style="margin-bottom:12px;">
             <tr><th style="padding:5px 8px;">Player</th><th style="padding:5px 8px;">Before</th><th style="padding:5px 8px;">After</th><th style="padding:5px 8px;">Δ</th></tr>
             ${rows}
           </table>
+          </div>
           <div class="mrow">
             <button class="mno" onclick="app.cancelForceSettle()">Cancel</button>
             <button class="mok" style="background:${isSurplus?'var(--amber)':'var(--red)'};" onclick="app.confirmForceSettle()">Apply</button>
@@ -1596,7 +1618,7 @@ class PokerApp {
     document.getElementById('modal').innerHTML='';
     this.scheduleSync();
     this.render();
-    this.toast('Proportional adjustment applied');
+    this.toast('Mismatch split equally');
   }
   togglePaid(key){
     if(!this.state.paidTransfers) this.state.paidTransfers={};
@@ -1630,6 +1652,7 @@ class PokerApp {
 }
 
 const app=new PokerApp();
+window.addEventListener("resize",()=>app._fitNames());
 document.addEventListener('DOMContentLoaded',()=>app.mount());
 </script>
 </body>
